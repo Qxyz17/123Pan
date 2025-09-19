@@ -23,7 +23,7 @@
 
 ### 直接运行
 
-Windows用户下载123pan_win_x86_64.zip，解压后直接运行android.exe。
+Windows用户下载Android.exe后直接运行。
 
 ### 脚本运行
 #### 环境准备
@@ -51,7 +51,7 @@ Windows用户下载123pan_win_x86_64.zip，解压后直接运行android.exe。
    python android.py
    ```
    
-   使用web协议（不建议，已停止更新）
+   使用web协议（非常不建议，已停止更新，而且限制自用流量包）
    
    ```bash
    python web.py
