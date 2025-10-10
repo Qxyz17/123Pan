@@ -30,7 +30,7 @@ jobs:
     - name: Build with PyInstaller
       run: |
         pyinstaller --onefile --windowed --icon=icon.ico "android.py"
-        pyinstaller --onefile --windowed --icon=icon.ico "web.py"
+        pyinstaller --onefile --windowed "web.py"
 
     - name: Upload build artifact
       uses: actions/upload-artifact@v4
