@@ -1,3 +1,2 @@
-pandas
-gevent
-bottle
+pyinstaller
+requests
