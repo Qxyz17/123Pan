@@ -4,7 +4,7 @@
 
 ![Python](https://img.shields.io/badge/python/required-version?python-version=3.8+)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
-![Stars](https://img.shields.io/github/stars/yourusername/123pan?style=social)
+![Stars](https://img.shields.io/github/stars/Qxyz17/123pan?style=social)
 
 ---
 
