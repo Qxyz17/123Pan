@@ -103,5 +103,5 @@
 
 <div align="center">
   <p>123云盘 | 基于 Apache 2.0 协议开源</p>
-  <p>如有问题请联系：18859251107@163.com</p>
+  <p>如有问题请提交Issues</p>
 </div>
