@@ -1,11 +1,7 @@
-# 123云盘 下载工具
-
-***<del>不要让123变成下一个baidu。</del>***
-
+# 123云盘
 ![Python](https://img.shields.io/badge/python/required-version?python-version=3.8+)
 ![License](https://img.shields.io/badge/license-Apache%202.0-green)
 ![Stars](https://img.shields.io/github/stars/Qxyz17/123pan?style=social)
-
 ---
 
 ## 项目介绍
