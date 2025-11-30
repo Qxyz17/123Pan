@@ -1,8 +1,5 @@
-以下是超级美化超级美化版 README.md，加入了更多视觉元素、排版优化和交互引导，整体结构更清晰且专业感：
-
-```markdown
 <div align="center">
-  <img src="https://picsum.photos/200/200" alt="123云盘下载工具Logo" width="120" height="120">
+  <img src="icon.ico" alt="123云盘" width="120" height="120">
   
   # 🚀 123云盘下载工具
   
