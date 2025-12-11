@@ -259,9 +259,9 @@ class Pan123:
             times += 1
             if times % 5 == 0:
                 print("警告：文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
-                print("为防止对服务器造成影响，暂停10秒")
+                print("为防止对服务器造成影响，暂停3秒")
                 print("请耐心等待！")
-                time.sleep(10)
+                time.sleep(3)
 
         if lenth_now < total:
             print("文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
@@ -307,7 +307,7 @@ class Pan123:
             print("输入more继续获取")
         print("--------------------")
 
-    # fileNumber 从0开始，0为第一个文件，传入时需要减一 ！！！
+    # fileNumber 从0开始，0为第一个文件，传入时需要减一 
     def link_by_number(self, file_number, showlink=True):
         file_detail = self.list[file_number]
         return self.link_by_fileDetail(file_detail, showlink)
@@ -482,7 +482,7 @@ class Pan123:
         recycle_list = json_recycle["data"]["InfoList"]
         self.recycle_list = recycle_list
 
-    # fileNumber 从0开始，0为第一个文件，传入时需要减一 ！！！
+    # fileNumber 从0开始，0为第一个文件，传入时需要减一
     def delete_file(self, file, by_num=True, operation=True):
         # operation = 'true' 删除 ， operation = 'false' 恢复
         if by_num:
@@ -887,8 +887,6 @@ class Pan123:
         print("创建失败")
         return
 
-# --- Pan123 嵌入结束 ---
-
 # 线程辅助
 class WorkerSignals(QtCore.QObject):
     finished = QtCore.pyqtSignal()
@@ -915,11 +913,11 @@ class ThreadedTask(QtCore.QRunnable):
         finally:
             self.signals.finished.emit()
 
-# 登录对话框（中文）
+# 登录对话框
 class LoginDialog(QtWidgets.QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("登录 123Pan")
+        self.setWindowTitle("登录123云盘")
         self.setModal(True)
         self.resize(420, 150)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
@@ -964,7 +962,7 @@ class LoginDialog(QtWidgets.QDialog):
             return
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         try:
-            # 构造 Pan123 并登录
+            # 构造123pan并登录
             try:
                 self.pan = Pan123(readfile=False, user_name=user, pass_word=pwd, input_pwd=False)
             except Exception:
@@ -994,18 +992,18 @@ class LoginDialog(QtWidgets.QDialog):
     def get_pan(self):
         return self.pan
 
-# 主窗口（所有按钮横向置顶，蓝白极简主题）
+# 主窗口
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("123Pan 客户端")
+        self.setWindowTitle("123云盘")
         self.resize(980, 620)
         self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         self.pan = None
         self.threadpool = QtCore.QThreadPool.globalInstance()
 
-        # 应用蓝白简约主题
+        # 应用123云盘主题
         self.apply_blue_white_theme()
 
         # 中央布局
@@ -1015,7 +1013,7 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(8)
 
-        # 顶部横向按钮栏（工具栏风格）
+        # 顶部横向按钮栏
         toolbar_h = QtWidgets.QHBoxLayout()
         toolbar_h.setSpacing(6)
         # 操作按钮（横向排列）
@@ -1083,7 +1081,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def apply_blue_white_theme(self):
         """
-        简约蓝白主题样式表
+        123云盘主题样式表
         """
         style = """
         QWidget {
@@ -1157,7 +1155,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def prompt_selected_row(self):
         rows = self.table.selectionModel().selectedRows()
         if not rows:
-            QtWidgets.QMessageBox.information(self, "提示", "请先选择一行。")
+            QtWidgets.QMessageBox.information(self, "提示", "请先选择一项。")
             return None
         return rows[0].row()
 
@@ -1231,7 +1229,7 @@ class MainWindow(QtWidgets.QMainWindow):
         menu = QtWidgets.QMenu()
         a_download = menu.addAction("下载")
         a_link = menu.addAction("显示链接")
-        a_delete = menu.addAction("删除（回收）")
+        a_delete = menu.addAction("删除")
         a_share = menu.addAction("分享")
         action = menu.exec_(self.table.viewport().mapToGlobal(pos))
         self.table.selectRow(row)
@@ -1534,3 +1532,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
