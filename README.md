@@ -91,13 +91,7 @@
 
 ## 🤝 贡献指南
 
-欢迎提交PR改进代码，或通过Issues反馈问题。贡献流程：
-
-1. Fork 本仓库
-2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
-3. 提交修改 (`git commit -m 'Add some amazing feature'`)
-4. 推送到分支 (`git push origin feature/amazing-feature`)
-5. 打开Pull Request
+欢迎提交PR改进代码，或通过Issues反馈问题。
 
 ---
 
