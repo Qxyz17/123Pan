@@ -1495,7 +1495,7 @@ class MainWindow(QtWidgets.QMainWindow):
             "driveId": 0,
             "expiration": "2099-12-12T08:00:00+08:00",
             "fileIdList": file_id_list,
-            "shareName": "My Share",
+            "shareName": "123云盘分享",
             "sharePwd": pwd or "",
             "event": "shareCreate"
         }
@@ -1532,4 +1532,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
