@@ -8,6 +8,142 @@ import time
 import random
 import re
 import uuid
+import platform
+
+# 配置文件路径
+if platform.system() == 'Windows':
+    CONFIG_DIR = os.path.join(os.environ.get('APPDATA', ''), 'Qxyz17', '123pan')
+else:
+    CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'Qxyz17', '123pan')
+CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.json')
+
+# 配置管理类
+class ConfigManager:
+    @staticmethod
+    def ensure_config_dir():
+        """确保配置目录存在"""
+        if not os.path.exists(CONFIG_DIR):
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+    
+    @staticmethod
+    def load_config():
+        """加载配置"""
+        ConfigManager.ensure_config_dir()
+        default_config = {
+            "userName": "",
+            "passWord": "",
+            "authorization": "",
+            "deviceType": "",
+            "osVersion": "",
+            "settings": {
+                "defaultDownloadPath": os.path.join(os.path.expanduser("~"), "Downloads"),
+                "askDownloadLocation": True
+            }
+        }
+        
+        if os.path.exists(CONFIG_FILE):
+            try:
+                with open(CONFIG_FILE, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    # 确保新版本配置兼容性
+                    if "settings" not in config:
+                        config["settings"] = default_config["settings"]
+                    return config
+            except Exception as e:
+                print(f"加载配置失败: {e}")
+                return default_config
+        return default_config
+    
+    @staticmethod
+    def save_config(config):
+        """保存配置"""
+        try:
+            ConfigManager.ensure_config_dir()
+            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(config, f, indent=2, ensure_ascii=False)
+            return True
+        except Exception as e:
+            print(f"保存配置失败: {e}")
+            return False
+    
+    @staticmethod
+    def get_setting(key, default=None):
+        """获取特定设置"""
+        config = ConfigManager.load_config()
+        return config.get("settings", {}).get(key, default)
+
+# 设置对话框
+class SettingsDialog(QtWidgets.QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("设置")
+        self.setModal(True)
+        self.resize(500, 200)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        
+        # 下载设置组
+        download_group = QtWidgets.QGroupBox("下载设置")
+        download_layout = QtWidgets.QVBoxLayout()
+        
+        # 默认下载路径
+        path_layout = QtWidgets.QHBoxLayout()
+        path_layout.addWidget(QtWidgets.QLabel("默认下载路径:"))
+        self.le_download_path = QtWidgets.QLineEdit()
+        self.le_download_path.setReadOnly(True)
+        path_layout.addWidget(self.le_download_path, 1)
+        self.btn_browse = QtWidgets.QPushButton("浏览...")
+        self.btn_browse.clicked.connect(self.browse_download_path)
+        path_layout.addWidget(self.btn_browse)
+        download_layout.addLayout(path_layout)
+        
+        # 下载前询问
+        self.cb_ask_location = QtWidgets.QCheckBox("每次下载前询问保存位置")
+        download_layout.addWidget(self.cb_ask_location)
+        
+        download_group.setLayout(download_layout)
+        layout.addWidget(download_group)
+        
+        # 按钮
+        button_layout = QtWidgets.QHBoxLayout()
+        button_layout.addStretch()
+        self.btn_save = QtWidgets.QPushButton("保存")
+        self.btn_cancel = QtWidgets.QPushButton("取消")
+        button_layout.addWidget(self.btn_save)
+        button_layout.addWidget(self.btn_cancel)
+        layout.addLayout(button_layout)
+        
+        # 连接信号
+        self.btn_save.clicked.connect(self.accept)
+        self.btn_cancel.clicked.connect(self.reject)
+        
+        # 加载当前设置
+        self.load_settings()
+    
+    def load_settings(self):
+        """加载当前设置"""
+        default_path = ConfigManager.get_setting("defaultDownloadPath", 
+                                                os.path.join(os.path.expanduser("~"), "Downloads"))
+        ask_location = ConfigManager.get_setting("askDownloadLocation", True)
+        
+        self.le_download_path.setText(default_path)
+        self.cb_ask_location.setChecked(ask_location)
+    
+    def browse_download_path(self):
+        """浏览下载路径"""
+        path = QtWidgets.QFileDialog.getExistingDirectory(
+            self, "选择默认下载路径", self.le_download_path.text()
+        )
+        if path:
+            self.le_download_path.setText(path)
+    
+    def get_settings(self):
+        """获取设置的参数"""
+        return {
+            "defaultDownloadPath": self.le_download_path.text(),
+            "askDownloadLocation": self.cb_ask_location.isChecked()
+        }
 
 class Pan123:
     def __init__(
@@ -194,16 +330,17 @@ class Pan123:
         return res_code_login
 
     def save_file(self):
+        """保存配置到统一配置文件"""
         try:
-            with open("123pan.txt", "w", encoding="utf_8") as f:
-                save_list = {
-                    "userName": self.user_name,
-                    "passWord": self.password,
-                    "authorization": self.authorization,
-                    "deviceType": self.devicetype,
-                    "osVersion": self.osversion,
-                }
-                f.write(json.dumps(save_list))
+            config = ConfigManager.load_config()
+            config.update({
+                "userName": self.user_name,
+                "passWord": self.password,
+                "authorization": self.authorization,
+                "deviceType": self.devicetype,
+                "osVersion": self.osversion,
+            })
+            ConfigManager.save_config(config)
             print("账号已保存")
         except Exception as e:
             print("保存账号失败:", e)
@@ -817,18 +954,16 @@ class Pan123:
             authorization="",
     ):
         try:
-            with open("123pan.txt", "r", encoding="utf-8") as f:
-                text = f.read()
-            text = json.loads(text)
-            deviceType = text.get("deviceType", "")
-            osVersion = text.get("osVersion", "")
+            config = ConfigManager.load_config()
+            deviceType = config.get("deviceType", "")
+            osVersion = config.get("osVersion", "")
             if deviceType:
                 self.devicetype = deviceType
             if osVersion:
                 self.osversion = osVersion
-            user_name = text.get("userName", user_name)
-            pass_word = text.get("passWord", pass_word)
-            authorization = text.get("authorization", authorization)
+            user_name = config.get("userName", user_name)
+            pass_word = config.get("passWord", pass_word)
+            authorization = config.get("authorization", authorization)
 
         except Exception:
             print("获取配置失败，重新输入")
@@ -946,13 +1081,9 @@ class LoginDialog(QtWidgets.QDialog):
         self.pan = None
         self.login_error = None
 
-        if os.path.exists("123pan.txt"):
-            try:
-                with open("123pan.txt", "r", encoding="utf-8") as f:
-                    cfg = json.load(f)
-                    self.le_user.setText(cfg.get("userName", ""))
-            except Exception:
-                pass
+        # 从配置文件中加载用户名
+        config = ConfigManager.load_config()
+        self.le_user.setText(config.get("userName", ""))
 
     def on_ok(self):
         user = self.le_user.text().strip()
@@ -1013,9 +1144,18 @@ class MainWindow(QtWidgets.QMainWindow):
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(8)
 
-        # 顶部横向按钮栏
+        # 顶部横向按钮栏（左上角为设置按钮）
         toolbar_h = QtWidgets.QHBoxLayout()
         toolbar_h.setSpacing(6)
+        
+        # 设置按钮（左上角齿轮图标）
+        self.btn_settings = QtWidgets.QPushButton("⚙️")
+        self.btn_settings.setToolTip("设置")
+        self.btn_settings.setMinimumHeight(30)
+        self.btn_settings.setMinimumWidth(40)
+        self.btn_settings.setStyleSheet("font-size: 16px;")
+        toolbar_h.addWidget(self.btn_settings)
+        
         # 操作按钮（横向排列）
         self.btn_refresh = QtWidgets.QPushButton("刷新")
         self.btn_more = QtWidgets.QPushButton("更多")
@@ -1066,6 +1206,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.status.showMessage("准备就绪")
 
         # 信号连接
+        self.btn_settings.clicked.connect(self.on_settings)
         self.btn_refresh.clicked.connect(lambda: self.refresh_file_list(reset_page=True))
         self.btn_more.clicked.connect(lambda: self.refresh_file_list(reset_page=False))
         self.btn_up.clicked.connect(self.on_up)
@@ -1129,9 +1270,21 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         self.setStyleSheet(style)
 
+    def on_settings(self):
+        """打开设置对话框"""
+        dlg = SettingsDialog(self)
+        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+            settings = dlg.get_settings()
+            # 保存设置到配置文件
+            config = ConfigManager.load_config()
+            config["settings"] = settings
+            ConfigManager.save_config(config)
+            QtWidgets.QMessageBox.information(self, "设置", "设置已保存")
+
     def startup_login_flow(self):
         cfg_loaded = False
-        if os.path.exists("123pan.txt"):
+        config = ConfigManager.load_config()
+        if config.get("userName") and config.get("passWord"):
             try:
                 self.pan = Pan123(readfile=True, input_pwd=False)
                 res_code = self.pan.get_dir(save=False)[0]
@@ -1267,9 +1420,20 @@ class MainWindow(QtWidgets.QMainWindow):
         file_index, file_detail = self.get_selected_detail()
         if file_detail is None:
             return
-        download_dir = QtWidgets.QFileDialog.getExistingDirectory(self, "选择下载文件夹", os.path.expanduser("~"))
-        if not download_dir:
-            return
+        
+        # 获取设置
+        ask_location = ConfigManager.get_setting("askDownloadLocation", True)
+        default_path = ConfigManager.get_setting("defaultDownloadPath", 
+                                                os.path.join(os.path.expanduser("~"), "Downloads"))
+        
+        download_dir = default_path
+        if ask_location:
+            download_dir = QtWidgets.QFileDialog.getExistingDirectory(
+                self, "选择下载文件夹", default_path
+            )
+            if not download_dir:
+                return
+        
         self.status.showMessage("正在解析下载链接...")
         task = ThreadedTask(self._task_get_download_and_stream, file_index, download_dir)
         task.signals.progress.connect(lambda p: self.status.showMessage(f"下载进度: {p}%", 2000))
