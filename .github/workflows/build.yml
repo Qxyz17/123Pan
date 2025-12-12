@@ -11,7 +11,16 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-      
+
+    - name: Verify required files exist
+      id: check_files
+      run: |
+        if (Test-Path "android.py" -PathType Leaf) {
+          echo "::set-output name=should_build::true"
+        } else {
+          echo "::set-output name=should_build::false"
+        }
+        
     - name: Set up Python
       if: steps.check_files.outputs.should_build == 'true'
       uses: actions/setup-python@v4
