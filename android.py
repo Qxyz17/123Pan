@@ -1160,12 +1160,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_refresh = QtWidgets.QPushButton("刷新")
         self.btn_more = QtWidgets.QPushButton("更多")
         self.btn_up = QtWidgets.QPushButton("上级")
-        self.btn_download = QtWidgets.QPushButton("下载选中")
+        self.btn_delete = QtWidgets.QPushButton("删除")
+        self.btn_download = QtWidgets.QPushButton("下载")
+        self.btn_share = QtWidgets.QPushButton("分享")
         self.btn_link = QtWidgets.QPushButton("显示链接")
         self.btn_upload = QtWidgets.QPushButton("上传文件")
         self.btn_mkdir = QtWidgets.QPushButton("新建文件夹")
-        self.btn_delete = QtWidgets.QPushButton("删除")
-        self.btn_share = QtWidgets.QPushButton("分享选中")
 
         # 设置按钮最小宽度统一外观
         btns = [self.btn_refresh, self.btn_more, self.btn_up, self.btn_download, self.btn_link,
@@ -1637,7 +1637,7 @@ class MainWindow(QtWidgets.QMainWindow):
         file_index, file_detail = self.get_selected_detail()
         if file_detail is None:
             return
-        r = QtWidgets.QMessageBox.question(self, "删除确认", f"确认将 '{file_detail['FileName']}' 移至回收站？", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
+        r = QtWidgets.QMessageBox.question(self, "删除确认", f"确认将 '{file_detail['FileName']}' 删除？", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
         if r == QtWidgets.QMessageBox.No:
             return
         try:
@@ -1651,7 +1651,7 @@ class MainWindow(QtWidgets.QMainWindow):
         file_index, file_detail = self.get_selected_detail()
         if file_detail is None:
             return
-        pwd, ok = QtWidgets.QInputDialog.getText(self, "分享", "提取码（留空表示不设）：")
+        pwd, ok = QtWidgets.QInputDialog.getText(self, "分享", "提取码（留空则没有提取码）：")
         if not ok:
             return
         file_id_list = str(file_detail["FileId"])
@@ -1696,4 +1696,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
