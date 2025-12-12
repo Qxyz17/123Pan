@@ -680,7 +680,7 @@ class Pan123:
                 "driveId": 0,
                 "expiration": "2099-12-12T08:00:00+08:00",
                 "fileIdList": file_id_list,
-                "shareName": "My Share",
+                "shareName": "123云盘分享",
                 "sharePwd": share_pwd,
                 "event": "shareCreate"
             }
@@ -1164,7 +1164,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_link = QtWidgets.QPushButton("显示链接")
         self.btn_upload = QtWidgets.QPushButton("上传文件")
         self.btn_mkdir = QtWidgets.QPushButton("新建文件夹")
-        self.btn_delete = QtWidgets.QPushButton("删除（回收）")
+        self.btn_delete = QtWidgets.QPushButton("删除")
         self.btn_share = QtWidgets.QPushButton("分享选中")
 
         # 设置按钮最小宽度统一外观
@@ -1696,3 +1696,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
