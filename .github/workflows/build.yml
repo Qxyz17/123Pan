@@ -35,4 +35,4 @@ jobs:
       with:
         name: android-app-${{ github.run_number }}
         path: dist/
-        retention-days: 7
+        retention-days: 917813
