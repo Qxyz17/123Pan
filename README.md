@@ -60,7 +60,7 @@
   "deviceType": "驱动类型",
   "osVersion": "安卓版本",
   "settings": {
-    "defaultDownloadPath": "默认下载路径,
+    "defaultDownloadPath": "默认下载路径",
     "askDownloadLocation": 开关
 }
 ```
