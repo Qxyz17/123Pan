@@ -1,7 +1,7 @@
 <div align="center">
-  <img src="icon.ico" alt="123云盘" width="120" height="120">
+  <img src="icon.ico" alt="123pan" width="120" height="120">
   
-  # 🚀 123云盘
+  # 🚀 123pan
   
   <p>突破限制 · 高效下载 · 简单易用</p>
   
@@ -18,9 +18,9 @@
 
 ## 📖 项目介绍
 
-123云盘下载工具是一款基于Python开发的高效下载辅助工具，通过模拟安卓客户端协议，帮助用户绕过123云盘的自用下载流量限制，实现无阻碍下载体验。
+123pan是一款基于Python开发的高效下载辅助工具，通过模拟安卓客户端协议，帮助用户绕过123云盘的自用下载流量限制，实现无阻碍下载体验。
 
-工具提供两种使用方式（安卓协议/网页协议），支持文件管理全流程操作，适用于需要高频下载云盘文件的用户。
+工具提供两种使用方式（安卓协议/网页协议），支持文件管理全流程操作，适用于需要下载云盘文件的用户。
 
 ---
 
@@ -41,26 +41,29 @@
 
 ## 🚀 快速开始
 
-1. 前往 [Releases](https://github.com/Qxyz17/123pan/releases) 下载对应系统的可执行文件
-   - Windows用户：下载`Android.exe`运行
-   - macOS/Linux用户：下载`android.py`文件运行
+1. 前往 [Releases](https://github.com/Qxyz17/123pan/releases) 下载可执行文件
+   - Windows用户：下载`123pan.exe`运行
+   - macOS/Linux用户：下载`123pan.py`文件运行
 
 2. 首次运行将自动生成配置文件，按照提示输入账号信息即可使用
 
 
 ## ⚙️ 配置说明
 
-首次运行工具后，会在当前目录生成 `123pan.txt` 配置文件，格式如下：
+首次运行工具后，会在C:\Users\%USERNAME%\AppData\Roaming\Qxyz17\123pan生成 `config.json` 配置文件，格式如下：
 
 ```json
 {
-  "userName": "你的账号",
-  "passWord": "你的密码",
-  "authorization": "自动生成的令牌"
+  "userName": "账号",
+  "passWord": "密码",
+  "authorization": "令牌",
+  "deviceType": "驱动类型",
+  "osVersion": "安卓版本",
+  "settings": {
+    "defaultDownloadPath": "默认下载路径,
+    "askDownloadLocation": 开关
 }
 ```
-
-> 📌 提示：配置文件自动加密保存，无需担心账号信息泄露
 
 ---
 
@@ -73,10 +76,6 @@
 2. **文件下载**
    - 输入文件编号，按提示确认下载
    - 下载文件临时以 `.123pan` 为后缀，完成后自动恢复原名称
-
-3. **目录导航**
-   - 输入文件夹编号进入子目录
-   - 输入 `..` 返回上一级目录
 
 ---
 
@@ -96,6 +95,6 @@
 ---
 
 <div align="center">
-  <p>123云盘 | 基于 Apache 2.0 协议开源</p>
+  <p>123pan | 基于 Apache 2.0 协议开源</p>
   <p>如有问题请提交Issues</p>
 </div>
