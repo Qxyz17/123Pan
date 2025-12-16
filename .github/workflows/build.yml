@@ -1,7 +1,9 @@
-name: Build 123pan
+name: Build 123pan.py
 
 on:
   push:
+    branches: [ main ]
+  pull_request:
     branches: [ main ]
 
 jobs:
@@ -11,28 +13,30 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-        
-    - name: Set up Python
-      if: steps.check_files.outputs.should_build == 'true'
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.8
       uses: actions/setup-python@v4
       with:
         python-version: '3.8'
-        
-    - name: Install dependencies
-      if: steps.check_files.outputs.should_build == 'true'
+        architecture: 'x64'
+
+    - name: Upgrade pip
       run: |
         python -m pip install --upgrade pip
-        python -m pip install -r requirements.txt
-        
-    - name: Build with PyInstaller
-      if: steps.check_files.outputs.should_build == 'true'
+      
+    - name: Install dependencies
       run: |
-        python -m Pyinstaller --onefile --windowed --icon=icon.ico --clean --exclude-module=PyQt5.QtWebEngine 123pan.py
-        
+        python -m pip install -r requirements.txt
+      
+    - name: Build with PyInstaller
+      run: |
+        python -m PyInstaller --onefile --windowed --icon=icon.ico --clean --exclude-module=PyQt5.QtWebEngine 123pan.py
+      
     - name: Upload artifacts
-      if: steps.check_files.outputs.should_build == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: android-app-${{ github.run_number }}
+        name: 123pan-executable
         path: dist/
-        retention-days: 7
+        if-no-files-found: error
