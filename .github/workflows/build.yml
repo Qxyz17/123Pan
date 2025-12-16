@@ -11,16 +11,6 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
-
-    - name: Verify required files exist
-      id: check_files
-      run: |
-        if (Test-Path "android.py" -PathType Leaf) {
-          echo "should_build=true" >> $env:GITHUB_OUTPUT
-        } else {
-          echo "should_build=false" >> $env:GITHUB_OUTPUT
-        }
-      shell: pwsh
         
     - name: Set up Python
       if: steps.check_files.outputs.should_build == 'true'
@@ -45,4 +35,4 @@ jobs:
       with:
         name: android-app-${{ github.run_number }}
         path: dist/
-        retention-days: 1
+        retention-days: 7
