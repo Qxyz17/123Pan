@@ -6,7 +6,13 @@ import hashlib
 import os
 import json
 import base64
+from logging_config import setup_logging
+import logging
+import sys
 
+# 初始化日志
+setup_logging()
+logger = logging.getLogger(__name__)
 
 class Pan123:
     def __init__(
@@ -23,7 +29,7 @@ class Pan123:
             self.read_ini(user_name, pass_word, input_pwd, authorization)
         else:
             if user_name == "" or pass_word == "":
-                print("读取已禁用，用户名或密码为空")
+                logger.warning("读取已禁用，用户名或密码为空")
                 if input_pwd:
                     user_name = input("请输入用户名:")
                     pass_word = input("请输入密码:")
@@ -79,8 +85,7 @@ class Pan123:
         res_sign = login_res.json()
         res_code_login = res_sign["code"]
         if res_code_login != 200:
-            print("code = 1 Error:" + str(res_code_login))
-            print(res_sign["message"])
+            logger.error("登录失败 code=%s message=%s", res_code_login, res_sign.get("message"))
             return res_code_login
         token = res_sign["data"]["token"]
         self.authorization = "Bearer " + token
@@ -119,7 +124,7 @@ class Pan123:
             }
 
             f.write(json.dumps(save_list))
-        print("Save!")
+        logger.info("保存配置成功")
 
     def get_dir(self):
         res_code_getdir = 0
@@ -130,9 +135,9 @@ class Pan123:
         while lenth_now < total or total == -1:
             base_url = "https://www.123pan.com/b/api/file/list/new"
 
-            # print(self.headerLogined)
+            # 调试：打印 header_logined（已注释）
             sign = getSign("/b/api/file/list/new")
-            print(sign)
+            logger.debug("sign: %s", sign)
             params = {
                 sign[0]: sign[1],
                 "driveId": 0,
@@ -148,14 +153,13 @@ class Pan123:
             }
 
             a = requests.get(base_url, headers=self.header_logined, params=params, timeout=10)
-            # print(a.text)
-            # print(a.headers)
+            # 调试：打印响应文本（已注释）
+            # 调试：打印响应头（已注释）
             text = a.json()
             res_code_getdir = text["code"]
             if res_code_getdir != 0:
-                print(a.text)
-                print(a.headers)
-                print("code = 2 Error:" + str(res_code_getdir))
+                logger.error("获取目录失败 code=%s response=%s", res_code_getdir, a.text)
+                logger.debug("响应头: %s", a.headers)
                 return res_code_getdir
             lists_page = text["data"]["InfoList"]
             lists += lists_page
@@ -171,7 +175,7 @@ class Pan123:
         return res_code_getdir
 
     def show(self):
-        print("--------------------")
+        logger.info("--------------------")
         for i in self.list:
             file_size = i["Size"]
             if file_size > 1048576:
@@ -180,25 +184,13 @@ class Pan123:
                 download_size_print = str(round(file_size / 1024, 2)) + "K"
 
             if i["Type"] == 0:
-                print(
-                    "\033[33m" + "编号:",
-                    self.list.index(i) + 1,
-                    "\033[0m \t\t" + download_size_print + "\t\t\033[36m",
-                    i["FileName"],
-                    "\033[0m",
-                )
+                logger.info("\033[33m编号: %s\033[0m \t\t%s\t\t\033[36m %s \033[0m", self.list.index(i) + 1, download_size_print, i["FileName"])
             elif i["Type"] == 1:
-                print(
-                    "\033[35m" + "编号:",
-                    self.list.index(i) + 1,
-                    " \t\t\033[36m",
-                    i["FileName"],
-                    "\033[0m",
-                )
+                logger.info("\033[35m编号: %s \t\t\033[36m %s \033[0m", self.list.index(i) + 1, i["FileName"])
 
-        print("--------------------")
+        logger.info("--------------------")
 
-    # fileNumber 从0开始，0为第一个文件，传入时需要减一 ！！！
+    # fileNumber 从0开始（0为第一个文件），传入时请减一！
     def link(self, file_number, showlink=True):
         file_detail = self.list[file_number]
         type_detail = file_detail["Type"]
@@ -217,7 +209,7 @@ class Pan123:
                 "fileName": file_detail["FileName"],
                 "size": file_detail["Size"],
             }
-        # print(down_request_data)
+        # 调试：打印下载请求数据（已注释）
 
         sign = getSign("/a/api/file/download_info")
 
@@ -228,22 +220,21 @@ class Pan123:
             data=down_request_data,
             timeout=10
         )
-        # print(linkRes.text)
+        # 调试：打印 link 接口响应文本（已注释）
         res_code_download = link_res.json()["code"]
         if res_code_download != 0:
-            print("code = 3 Error:" + str(res_code_download))
-            # print(linkRes.json())
+            logger.error("下载链接请求失败 code=%s", res_code_download)
             return res_code_download
         download_link_base64 = link_res.json()["data"]["DownloadUrl"]
         base64_url = re.findall("params=(.*)&", download_link_base64)[0]
-        # print(Base64Url)
+        # 调试：打印 base64 编码的 URL（已注释）
         down_load_url = base64.b64decode(base64_url)
         down_load_url = down_load_url.decode("utf-8")
 
         next_to_get = requests.get(down_load_url,timeout=10).json()
         redirect_url = next_to_get["data"]["redirect_url"]
         if showlink:
-            print(redirect_url)
+            logger.info("下载跳转链接: %s", redirect_url)
 
         return redirect_url
 
@@ -252,7 +243,7 @@ class Pan123:
         down_load_url = self.link(file_number, showlink=False)
         file_name = file_detail["FileName"]  # 文件名
         if os.path.exists(file_name):
-            print("文件 " + file_name + " 已存在，是否要覆盖？")
+            logger.warning("文件 %s 已存在，是否要覆盖？", file_name)
             sure_download = input("输入1覆盖，2取消：")
             if sure_download != "1":
                 return
@@ -265,7 +256,7 @@ class Pan123:
             size_print_download = str(round(file_size / 1048576, 2)) + "M"
         else:
             size_print_download = str(round(file_size / 1024, 2)) + "K"
-        print(file_name + "    " + size_print_download)
+        logger.info("开始下载: %s    %s", file_name, size_print_download)
         time1 = time.time()
         time_temp = time1
         data_count_temp = 0
@@ -290,19 +281,22 @@ class Pan123:
                         speed_print = str(round(speed_m, 2)) + "M/S"
                     else:
                         speed_print = str(round(speed_m * 1024, 2)) + "K/S"
-                    print(
+                    sys.stdout.write(
                         "\r [%s%s] %d%%  %s"
                         % (
                             done_block * "█",
                             " " * (50 - 1 - done_block),
                             now_jd,
                             speed_print,
-                        ),
-                        end="",
+                        )
                     )
+                    sys.stdout.flush()
                 elif data_count == content_size:
-                    print("\r [%s%s] %d%%  %s" % (50 * "█", "", 100, ""), end="")
-            print("\nok")
+                    sys.stdout.write("\r [%s%s] %d%%  %s" % (50 * "█", "", 100, ""))
+                    sys.stdout.flush()
+            sys.stdout.write("\nok\n")
+            sys.stdout.flush()
+            logger.info("下载完成: %s", file_name)
 
     def recycle(self):
         recycle_id = 0
@@ -317,24 +311,24 @@ class Pan123:
         recycle_list = json_recycle["data"]["InfoList"]
         self.recycle_list = recycle_list
 
-    # fileNumber 从0开始，0为第一个文件，传入时需要减一 ！！！
+    # fileNumber 从0开始（0为第一个文件），传入时请减一！
     def delete_file(self, file, by_num=True, operation=True):
         # operation = 'true' 删除 ， operation = 'false' 恢复
         if by_num:
-            print(file)
+            logger.debug("准备删除文件编号: %s", file)
             if not str(file).isdigit():
-                print("请输入数字")
+                logger.error("请输入数字")
                 return -1
             if 0 <= file < len(self.list):
                 file_detail = self.list[file]
             else:
-                print("不在合理范围内")
+                logger.error("不在合理范围内")
                 return
         else:
             if file in self.list:
                 file_detail = file
             else:
-                print("文件不存在")
+                logger.error("文件不存在")
                 return
         data_delete = {
             "driveId": 0,
@@ -348,9 +342,9 @@ class Pan123:
             timeout=10
         )
         dele_json = delete_res.json()
-        print(dele_json)
+        logger.debug("删除响应: %s", dele_json)
         message = dele_json["message"]
-        print(message)
+        logger.info("删除结果: %s", message)
 
     def share(self):
         file_id_list = ""
@@ -365,11 +359,11 @@ class Pan123:
                     share_id = self.list[int(share_num) - 1]["FileId"]
                     share_name = self.list[int(share_num) - 1]["FileName"]
                     share_name_list.append(share_name)
-                    print(share_name_list)
+                    logger.debug("已选分享文件: %s", share_name_list)
                     file_id_list = file_id_list + str(share_id) + ","
                     add = input("输入1添加文件，0发起分享，其他取消")
             else:
-                print("请输入数字，，")
+                logger.error("请输入数字")
                 add = "1"
         if str(add) == "0":
             share_pwd = input("提取码，不设留空：")
@@ -389,23 +383,23 @@ class Pan123:
             )
             share_res_json = share_res.json()
             message = share_res_json["message"]
-            print(message)
+            logger.info("分享结果: %s", message)
             share_key = share_res_json["data"]["ShareKey"]
             share_url = "https://www.123pan.com/s/" + share_key
-            print("分享链接：\n" + share_url + "提取码：" + share_pwd)
+            logger.info("分享链接：%s 提取码：%s", share_url, share_pwd)
         else:
-            print("退出分享")
+            logger.info("退出分享")
 
     def up_load(self, file_path):
         file_path = file_path.replace('"', "")
         file_path = file_path.replace("\\", "/")
         file_name = file_path.split("/")[-1]
-        print("文件名:", file_name)
+        logger.info("准备上传文件: %s", file_name)
         if not os.path.exists(file_path):
-            print("文件不存在，请检查路径是否正确")
+            logger.error("文件不存在，请检查路径是否正确: %s", file_path)
             return
         if os.path.isdir(file_path):
-            print("暂不支持文件夹上传")
+            logger.error("暂不支持文件夹上传: %s", file_path)
             return
         fsize = os.path.getsize(file_path)
         with open(file_path, "rb") as f:
@@ -445,7 +439,7 @@ class Pan123:
             elif sure_upload == "2":
                 list_up_request["duplicate"] = 2
             else:
-                print("取消上传")
+                logger.info("取消上传")
                 return
             sign = getSign("/b/api/file/upload_request")
             up_res = requests.post(
@@ -458,15 +452,14 @@ class Pan123:
             up_res_json = up_res.json()
         res_code_up = up_res_json["code"]
         if res_code_up == 0:
-            # print(upResJson)
-            # print("上传请求成功")
+            # 调试：打印上传请求响应（已注释）
+            # 调试：上传请求成功（已注释）
             reuse = up_res_json["data"]["Reuse"]
             if reuse:
-                print("上传成功，文件已MD5复用")
+                logger.info("上传成功，文件已MD5复用")
                 return
         else:
-            print(up_res_json)
-            print("上传请求失败")
+            logger.error("上传请求失败: %s", up_res_json)
             return
 
         bucket = up_res_json["data"]["Bucket"]
@@ -474,7 +467,7 @@ class Pan123:
         upload_key = up_res_json["data"]["Key"]
         upload_id = up_res_json["data"]["UploadId"]
         up_file_id = up_res_json["data"]["FileId"]  # 上传文件的fileId,完成上传后需要用到
-        print("上传文件的fileId:", up_file_id)
+        logger.info("上传文件的 fileId: %s", up_file_id)
 
         # 获取已将上传的分块
         start_data = {
@@ -492,13 +485,10 @@ class Pan123:
         start_res_json = start_res.json()
         res_code_up = start_res_json["code"]
         if res_code_up == 0:
-            # print(startResJson)
+            # 调试：打印已上传分块列表响应（已注释）
             pass
         else:
-            print(start_data)
-            print(start_res_json)
-
-            print("获取传输列表失败")
+            logger.error("获取传输列表失败: request=%s response=%s", start_data, start_res_json)
             return
 
         # 分块，每一块取一次链接，依次上传
@@ -510,7 +500,8 @@ class Pan123:
                 data = f.read(block_size)
 
                 precent = round(put_size / fsize, 2)
-                print("\r已上传：" + str(precent * 100) + "%", end="")
+                sys.stdout.write("\r已上传：" + str(precent * 100) + "%")
+                sys.stdout.flush()
                 put_size = put_size + len(data)
 
                 if not data:
@@ -536,23 +527,23 @@ class Pan123:
                 get_link_res_json = get_link_res.json()
                 res_code_up = get_link_res_json["code"]
                 if res_code_up == 0:
-                    # print("获取链接成功")
+                    # 调试：获取上传链接成功（已注释）
                     pass
                 else:
-                    print("获取链接失败")
-                    # print(getLinkResJson)
+                    logger.error("获取上传链接失败")
+                    # 调试：打印获取上传链接响应（已注释）
                     return
-                # print(getLinkResJson)
+                # 调试：打印获取上传链接响应（已注释）
                 upload_url = get_link_res_json["data"]["presignedUrls"][
                     str(part_number_start)
                 ]
-                # print("上传链接",uploadUrl)
+                # 调试：打印上传链接（已注释）
                 requests.put(upload_url, data=data, timeout=10)
-                # print("put")
+                # 调试：已发送 PUT 请求（已注释）
 
                 part_number_start = part_number_start + 1
 
-        print("\n处理中")
+        logger.info("处理中")
         # 完成标志
         # 1.获取已上传的块
         uploaded_list_url = "https://www.123pan.com/b/api/file/s3_list_upload_parts"
@@ -562,7 +553,7 @@ class Pan123:
             "uploadId": upload_id,
             "storageNode": storage_node,
         }
-        # print(uploadedCompData)
+        # 调试：打印已上传的分块数据（已注释）
         requests.post(
             uploaded_list_url,
             headers=self.header_logined,
@@ -584,7 +575,7 @@ class Pan123:
             time.sleep(3)
         close_up_session_url = "https://www.123pan.com/b/api/file/upload_complete"
         close_up_session_data = {"fileId": up_file_id}
-        # print(closeUpSessionData)
+        # 调试：打印关闭上传会话数据（已注释）
         close_up_session_res = requests.post(
             close_up_session_url,
             headers=self.header_logined,
@@ -592,13 +583,12 @@ class Pan123:
             timeout=10
         )
         close_res_json = close_up_session_res.json()
-        # print(closeResJson)
+        # 调试：打印关闭上传会话响应（已注释）
         res_code_up = close_res_json["code"]
         if res_code_up == 0:
-            print("上传成功")
+            logger.info("上传成功")
         else:
-            print("上传失败")
-            print(close_res_json)
+            logger.error("上传失败: %s", close_res_json)
             return
 
     # dirId 就是 fileNumber，从0开始，0为第一个文件，传入时需要减一 ！！！（好像文件夹都排在前面）
@@ -611,7 +601,7 @@ class Pan123:
                     self.get_dir()
                     self.show()
                 else:
-                    print("已经是根目录")
+                    logger.info("已经是根目录")
                 return
             if dir_num == "/":
                 self.parent_file_id = 0
@@ -619,14 +609,14 @@ class Pan123:
                 self.get_dir()
                 self.show()
                 return
-            print("输入错误")
+            logger.error("输入错误")
             return
         dir_num = int(dir_num) - 1
         if dir_num >= (len(self.list) - 1) or dir_num < 0:
-            print("输入错误")
+            logger.error("输入错误")
             return
         if self.list[dir_num]["Type"] != 1:
-            print("不是文件夹")
+            logger.error("不是文件夹")
             return
         self.parent_file_id = self.list[dir_num]["FileId"]
         self.parent_file_list.append(self.parent_file_id)
@@ -656,7 +646,7 @@ class Pan123:
             authorization = text["authorization"]
 
         except:
-            print("获取配置失败，重新登录")
+            logger.warning("获取配置失败，重新登录")
 
             if user_name == "" or pass_word == "":
                 if input_pwd:
@@ -674,7 +664,7 @@ class Pan123:
         if not remakedir:
             for i in self.list:
                 if i["FileName"] == dirname:
-                    print("文件夹已存在")
+                    logger.info("文件夹已存在: %s", dirname)
                     return i["FileId"]
 
         url = "https://www.123pan.com/a/api/file/upload_request"
@@ -700,24 +690,24 @@ class Pan123:
         )
         try:
             res_json = res_mk.json()
-            print(res_json)
+            logger.debug("mkdir 响应: %s", res_json)
         except json.decoder.JSONDecodeError:
-            print("创建失败")
-            print(res_mk.text)
+            logger.error("创建失败: %s", res_mk.text)
             return
         code_mkdir = res_json["code"]
 
         if code_mkdir == 0:
-            print("创建成功: ", res_json["data"]["FileId"])
+            logger.info("创建成功: %s", res_json["data"]["FileId"])
             self.get_dir()
             return res_json["data"]["Info"]["FileId"]
-        print("创建失败")
-        print(res_json)
+        logger.error("创建失败: %s", res_json)
         return
 
 
 if __name__ == "__main__":
-    print("web协议将废弃，请使用android协议")
+    setup_logging()
+    logger = logging.getLogger(__name__)
+    logger.warning("web 协议将废弃，请使用 android 协议")
     pan = Pan123(readfile=True, input_pwd=True)
     pan.show()
     while True:
@@ -727,11 +717,11 @@ if __name__ == "__main__":
         if command == "re":
             code = pan.get_dir()
             if code == 0:
-                print("刷新目录成功")
+                logger.info("刷新目录成功")
             pan.show()
         if command.isdigit():
             if int(command) > len(pan.list) or int(command) < 1:
-                print("输入错误")
+                logger.error("输入错误")
                 continue
             if pan.list[int(command) - 1]["Type"] == 1:
                 pan.cdById(pan.list[int(command) - 1]["FileId"])
@@ -741,21 +731,19 @@ if __name__ == "__main__":
                     size_print_show = str(round(size / 1048576, 2)) + "M"
                 else:
                     size_print_show = str(round(size / 1024, 2)) + "K"
-                # print(pan.list[int(command) - 1])
                 name = pan.list[int(command) - 1]["FileName"]
-                print(name + "  " + size_print_show)
-                print("press 1 to download now: ", end="")
-                sure = input()
+                logger.info("%s  %s", name, size_print_show)
+                sure = input("press 1 to download now: ")
                 if sure == "1":
                     pan.download(int(command) - 1)
         elif command[0:9] == "download ":
             if command[9:].isdigit():
                 if int(command[9:]) > len(pan.list) or int(command[9:]) < 1:
-                    print("输入错误")
+                    logger.error("输入错误")
                     continue
                 pan.download(int(command[9:]) - 1)
             else:
-                print("输入错误")
+                logger.error("输入错误")
         elif command == "exit":
             break
         elif command == "log":
@@ -766,11 +754,11 @@ if __name__ == "__main__":
         elif command[0:5] == "link ":
             if command[5:].isdigit():
                 if int(command[5:]) > len(pan.list) or int(command[5:]) < 1:
-                    print("输入错误")
+                    logger.error("输入错误")
                     continue
                 pan.link(int(command[5:]) - 1)
             else:
-                print("输入错误")
+                logger.error("输入错误")
         elif command == "upload":
             filepath = input("请输入文件路径：")
             pan.up_load(filepath)
@@ -780,28 +768,26 @@ if __name__ == "__main__":
             pan.share()
         elif command[0:6] == "delete":
             if command == "delete":
-                print("请输入要删除的文件编号：", end="")
-                fileNumber = input()
+                fileNumber = input("请输入要删除的文件编号：")
             else:
                 if command[6] == " ":
                     fileNumber = command[7:]
                 else:
-                    print("输入错误")
+                    logger.error("输入错误")
                     continue
                 if fileNumber == "":
-                    print("请输入要删除的文件编号：", end="")
-                    fileNumber = input()
+                    fileNumber = input("请输入要删除的文件编号：")
                 else:
                     fileNumber = fileNumber[0:]
             if fileNumber.isdigit():
                 if int(fileNumber) > len(pan.list) or int(fileNumber) < 1:
-                    print("输入错误")
+                    logger.error("输入错误")
                     continue
                 pan.delete_file(int(fileNumber) - 1)
                 pan.get_dir()
                 pan.show()
             else:
-                print("输入错误")
+                logger.error("输入错误")
 
         elif command[:3] == "cd ":
             path = command[3:]
@@ -815,10 +801,10 @@ if __name__ == "__main__":
                     newPath = input("请输入目录名:")
                 else:
                     newPath = newPath[0:]
-            print(pan.mkdir(newPath))
+                logger.info("mkdir 结果: %s", pan.mkdir(newPath))
 
         elif command == "reload":
             pan.read_ini("", "", True)
-            print("读取成功")
+            logger.info("读取成功")
             pan.get_dir()
             pan.show()
