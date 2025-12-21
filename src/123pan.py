@@ -48,7 +48,7 @@ import uuid
 import platform
 
 import logging
-from pan.logging_config import setup_logging
+from logging_config import setup_logging
 
 # 及早初始化日志
 setup_logging()
