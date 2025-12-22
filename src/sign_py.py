@@ -1,6 +1,11 @@
+# https://github.com/Qxyz17/123pan
+# src/sign_py.py
+
 import time
 import random
 from datetime import datetime
+from logging_config import setup_logging
+import logging
 
 
 def getSign(e):
@@ -61,11 +66,11 @@ def getSign(e):
             return t
 
         n = generate_array()
-        # print(n)
+        # 打印 n（调试用）
         for i in range(len(r)):
-            # print("a:", unsigned_right_shift(a, 8))
+            # 打印 a 的右移结果（调试用）
             a = unsigned_right_shift(a, 8) ^ n[255 & (a ^ ord(r[i]))]
-        # print("zz", a)
+        # 打印 zz, a（调试）
         return str((simulate_js_overflow(-1, a)) & 0xFFFFFFFF)
 
     def generate_timestamp():
@@ -80,9 +85,9 @@ def getSign(e):
         return o
 
     def formatDate(t, e=None, n=8):
-        t = int(t)  # Use the original timestamp
+        t = int(t)  # 使用原始时间戳
         t = t - 480 * 60
-        r = datetime.fromtimestamp(t + 3600 * n)  # Convert to seconds and add 'n' hours
+        r = datetime.fromtimestamp(t + 3600 * n)  # 转换为秒并加上 'n' 小时
         data = {
             'y': str(r.year),
             'm': f"0{r.month}" if r.month < 10 else str(r.month),
@@ -117,5 +122,7 @@ def getSign(e):
 
 
 if __name__ == '__main__':
+    setup_logging()
+    logger = logging.getLogger(__name__)
     e = '/b/api/file/list/new'
-    print(getSign(e))
+    logger.info("签名: %s", getSign(e))

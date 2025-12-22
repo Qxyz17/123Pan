@@ -1,4 +1,6 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
+# https://github.com/Qxyz17/123pan
+# src/123pam.py
+
 import sys
 import os
 import hashlib
@@ -9,6 +11,14 @@ import random
 import re
 import uuid
 import platform
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtWidgets import QLineEdit,QDialog
+import logging
+from logging_config import setup_logging
+
+# 及早初始化日志
+setup_logging()
+logger = logging.getLogger(__name__)
 
 # 配置文件路径
 if platform.system() == 'Windows':
@@ -50,7 +60,7 @@ class ConfigManager:
                         config["settings"] = default_config["settings"]
                     return config
             except Exception as e:
-                print(f"加载配置失败: {e}")
+                logger.exception("加载配置失败: %s", e)
                 return default_config
         return default_config
     
@@ -63,7 +73,7 @@ class ConfigManager:
                 json.dump(config, f, indent=2, ensure_ascii=False)
             return True
         except Exception as e:
-            print(f"保存配置失败: {e}")
+            logger.exception("保存配置失败: %s", e)
             return False
     
     @staticmethod
@@ -267,7 +277,7 @@ class Pan123:
             self.read_ini(user_name, pass_word, input_pwd, authorization)
         else:
             if user_name == "" or pass_word == "":
-                print("读取已禁用，用户名或密码为空")
+                logger.warning("读取已禁用，用户名或密码为空")
                 if input_pwd:
                     user_name = input("请输入用户名:")
                     pass_word = input("请输入密码:")
@@ -308,8 +318,8 @@ class Pan123:
         res_sign = login_res.json()
         res_code_login = res_sign["code"]
         if res_code_login != 200:
-            print("code = 1 Error:" + str(res_code_login))
-            print(res_sign.get("message", ""))
+            logger.error("code = 1 Error: %s", res_code_login)
+            logger.error(res_sign.get("message", ""))
             return res_code_login
         set_cookies = login_res.headers.get("Set-Cookie", "")
         set_cookies_list = {}
@@ -341,9 +351,9 @@ class Pan123:
                 "osVersion": self.osversion,
             })
             ConfigManager.save_config(config)
-            print("账号已保存")
+            logger.info("账号已保存")
         except Exception as e:
-            print("保存账号失败:", e)
+            logger.exception("保存账号失败: %s", e)
 
     def get_dir(self, save=True):
         return self.get_dir_by_id(self.parent_file_id, save)
@@ -379,14 +389,14 @@ class Pan123:
             }
             try:
                 a = requests.get(base_url, headers=self.header_logined, params=params, timeout=30)
-            except Exception:
-                print("连接失败")
+            except Exception as e:
+                logger.exception("连接失败: %s", e)
                 return -1, []
             text = a.json()
             res_code_getdir = text["code"]
             if res_code_getdir != 0:
-                print("code = 2 Error:" + str(res_code_getdir))
-                print(text.get("message", ""))
+                logger.error("code = 2 Error: %s", res_code_getdir)
+                logger.error(text.get("message", ""))
                 return res_code_getdir, []
             lists_page = text["data"]["InfoList"]
             lists += lists_page
@@ -395,13 +405,13 @@ class Pan123:
             page += 1
             times += 1
             if times % 5 == 0:
-                print("警告：文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
-                print("为防止对服务器造成影响，暂停3秒")
-                print("请耐心等待！")
+                logger.warning("文件夹内文件过多：%s/%s", lenth_now, total)
+                logger.warning("为防止对服务器造成影响，暂停3秒")
+                logger.warning("请耐心等待！")
                 time.sleep(3)
 
         if lenth_now < total:
-            print("文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
+            logger.warning("文件夹内文件过多：%s/%s", lenth_now, total)
             self.all_file = False
         else:
             self.all_file = True
@@ -413,7 +423,7 @@ class Pan123:
         return res_code_getdir, lists
 
     def show(self):
-        print("--------------------")
+        logger.info("--------------------")
         for i in self.list:
             file_size = i["Size"]
             if file_size > 1073741824:
@@ -424,25 +434,15 @@ class Pan123:
                 download_size_print = str(round(file_size / 1024, 2)).ljust(6) + " KB"
 
             if i["Type"] == 0:
-                print(
-                    "\033[33m" + "编号:",
-                    self.list.index(i) + 1,
-                    "\033[0m \t\t" + download_size_print + "\t\t\033[36m",
-                    i["FileName"],
-                    "\033[0m",
-                )
+                logger.info("\033[33m编号: %s \033[0m \t\t%s\t\t\033[36m%s\033[0m", self.list.index(i) + 1, download_size_print, i["FileName"])
+
             elif i["Type"] == 1:
-                print(
-                    "\033[35m" + "编号:",
-                    self.list.index(i) + 1,
-                    " \t\t\033[36m",
-                    i["FileName"],
-                    "\033[0m",
-                )
+                logger.info("\033[35m编号: %s \t\t\033[36m%s\033[0m", self.list.index(i) + 1, i["FileName"])
+
         if not self.all_file:
-            print("剩余" + str(self.total - len(self.list)) + "个文件未获取")
-            print("输入more继续获取")
-        print("--------------------")
+            logger.info("剩余 %s 个文件未获取", self.total - len(self.list))
+            logger.info("输入more继续获取")
+        logger.info("--------------------")
 
     # fileNumber 从0开始，0为第一个文件，传入时需要减一 
     def link_by_number(self, file_number, showlink=True):
@@ -477,22 +477,22 @@ class Pan123:
         link_res_json = link_res.json()
         res_code_download = link_res_json["code"]
         if res_code_download != 0:
-            print("code = 3 Error:" + str(res_code_download))
-            print(link_res_json.get("message", ""))
+            logger.error("code = 3 Error: %s", res_code_download)
+            logger.error(link_res_json.get("message", ""))
             return res_code_download
         down_load_url = link_res.json()["data"]["DownloadUrl"]
         next_to_get = requests.get(down_load_url, timeout=10, allow_redirects=False).text
         url_pattern = re.compile(r"href='(https?://[^']+)'")
         redirect_url = url_pattern.findall(next_to_get)[0]
         if showlink:
-            print(redirect_url)
+            logger.debug(redirect_url)
 
         return redirect_url
 
     def download(self, file_number, download_path="download"):
         file_detail = self.list[file_number]
         if file_detail["Type"] == 1:
-            print("开始下载")
+            logger.info("开始下载")
             file_name = file_detail["FileName"] + ".zip"
         else:
             file_name = file_detail["FileName"]  # 文件名
@@ -505,9 +505,9 @@ class Pan123:
     def download_from_url(self, url, file_name, download_path="download"):
         if os.path.exists(download_path + "/" + file_name):
             if self.download_mode == 4:
-                print("文件 " + file_name + "已跳过")
+                logger.info("文件 %s 已跳过", file_name)
                 return
-            print("文件 " + file_name + " 已存在，是否要覆盖？")
+            logger.info("文件 %s 已存在，是否要覆盖？", file_name)
             sure_download = input("输入1覆盖，2跳过，3全部覆盖，4全部跳过：")
             if sure_download == "2":
                 return
@@ -515,13 +515,13 @@ class Pan123:
                 self.download_mode = 3
             elif sure_download == "4":
                 self.download_mode = 4
-                print("已跳过")
+                logger.info("已跳过")
                 return
             else:
                 os.remove(download_path + "/" + file_name)
 
         if not os.path.exists(download_path):
-            print("文件夹不存在，创建文件夹")
+            logger.info("文件夹不存在，创建文件夹")
             os.makedirs(download_path)
         down = requests.get(url, stream=True, timeout=10)
 
@@ -532,7 +532,7 @@ class Pan123:
             size_print_download = str(round(file_size / 1048576, 2)) + "MB"
         else:
             size_print_download = str(round(file_size / 1024, 2)) + "KB"
-        print(file_name + "    " + size_print_download)
+        logger.info("%s    %s", file_name, size_print_download)
         time1 = time.time()
         time_temp = time1
         data_count_temp = 0
@@ -557,19 +557,19 @@ class Pan123:
                         speed_print = str(round(speed_m, 2)) + "MB/S"
                     else:
                         speed_print = str(round(speed_m * 1024, 2)) + "KB/S"
-                    print(
+                    sys.stdout.write(
                         "\r [%s%s] %d%%  %s"
                         % (
                             done_block * "█",
                             " " * (50 - 1 - done_block),
                             now_jd,
                             speed_print,
-                        ),
-                        end="",
+                        )
                     )
+                    sys.stdout.flush()
                 elif data_count == content_size:
-                    print("\r [%s%s] %d%%  %s" % (50 * "█", "", 100, ""), end="")
-            print("\nok")
+                    logger.info("[%s%s] %d%%  %s", 50 * "█", "", 100, "")
+            logger.info("ok")
 
         os.rename(download_path + "/" + file_name + ".123pan", download_path + "/" + file_name)
 
@@ -590,7 +590,7 @@ class Pan123:
     def download_dir(self, file_detail, download_path_root="download"):
         self.name_dict[file_detail["FileId"]] = file_detail["FileName"]
         if file_detail["Type"] != 1:
-            print("不是文件夹")
+            logger.warning("不是文件夹")
             return
 
         all_list = self.get_dir_by_id(file_detail["FileId"], save=False, all=True, limit=100)[1]
@@ -623,20 +623,20 @@ class Pan123:
     def delete_file(self, file, by_num=True, operation=True):
         # operation = 'true' 删除 ， operation = 'false' 恢复
         if by_num:
-            print(file)
+            logger.debug(file)
             if not str(file).isdigit():
-                print("请输入数字")
+                logger.warning("请输入数字")
                 return -1
             if 0 <= file < len(self.list):
                 file_detail = self.list[file]
             else:
-                print("不在合理范围内")
+                logger.warning("不在合理范围内")
                 return
         else:
             if file in self.list:
                 file_detail = file
             else:
-                print("文件不存在")
+                logger.warning("文件不存在")
                 return
         data_delete = {
             "driveId": 0,
@@ -650,9 +650,9 @@ class Pan123:
             timeout=10
         )
         dele_json = delete_res.json()
-        print(dele_json)
+        logger.debug("delete response: %s", dele_json)
         message = dele_json.get("message", "")
-        print(message)
+        logger.info(message)
 
     def share(self):
         file_id_list = ""
@@ -667,11 +667,11 @@ class Pan123:
                     share_id = self.list[int(share_num) - 1]["FileId"]
                     share_name = self.list[int(share_num) - 1]["FileName"]
                     share_name_list.append(share_name)
-                    print(share_name_list)
+                    logger.info("当前分享文件列表: %s", share_name_list)
                     file_id_list = file_id_list + str(share_id) + ","
                     add = input("输入1添加文件，0发起分享，其他取消")
             else:
-                print("请输入数字，，")
+                logger.warning("请输入数字")
                 add = "1"
         if str(add) == "0":
             share_pwd = input("提取码，不设留空：")
@@ -692,27 +692,27 @@ class Pan123:
             )
             share_res_json = share_res.json()
             if share_res_json.get("code", -1) != 0:
-                print(share_res_json.get("message", ""))
-                print("分享失败")
+                logger.error(share_res_json.get("message", ""))
+                logger.error("分享失败")
                 return
             message = share_res_json.get("message", "")
-            print(message)
+            logger.info(message)
             share_key = share_res_json["data"]["ShareKey"]
             share_url = "https://www.123pan.com/s/" + share_key
-            print("分享链接：\n" + share_url + "提取码：" + share_pwd)
+            logger.info("分享链接：%s 提取码：%s", share_url, share_pwd)
         else:
-            print("退出分享")
+            logger.info("退出分享")
 
     def up_load(self, file_path):
         file_path = file_path.replace('"', "")
         file_path = file_path.replace("\\", "/")
         file_name = file_path.split("/")[-1]
-        print("文件名:", file_name)
+        logger.info("文件名: %s", file_name)
         if not os.path.exists(file_path):
-            print("文件不存在，请检查路径是否正确")
+            logger.warning("文件不存在，请检查路径是否正确")
             return
         if os.path.isdir(file_path):
-            print("暂不支持文件夹上传")
+            logger.warning("暂不支持文件夹上传")
             return
         fsize = os.path.getsize(file_path)
         with open(file_path, "rb") as f:
@@ -750,7 +750,7 @@ class Pan123:
             elif sure_upload == "2":
                 list_up_request["duplicate"] = 2
             else:
-                print("取消上传")
+                logger.info("取消上传")
                 return
             up_res = requests.post(
                 "https://www.123pan.com/b/api/file/upload_request",
@@ -763,11 +763,11 @@ class Pan123:
         if res_code_up == 0:
             reuse = up_res_json["data"].get("Reuse", False)
             if reuse:
-                print("上传成功，文件已MD5复用")
+                logger.info("上传成功，文件已MD5复用")
                 return
         else:
-            print(up_res_json)
-            print("上传请求失败")
+            logger.error("upload request failed: %s", up_res_json)
+            logger.error("上传请求失败")
             return
 
         bucket = up_res_json["data"]["Bucket"]
@@ -775,7 +775,7 @@ class Pan123:
         upload_key = up_res_json["data"]["Key"]
         upload_id = up_res_json["data"]["UploadId"]
         up_file_id = up_res_json["data"]["FileId"]  # 上传文件的fileId,完成上传后需要用到
-        print("上传文件的fileId:", up_file_id)
+        logger.info("上传文件的fileId: %s", up_file_id)
 
         # 获取已将上传的分块
         start_data = {
@@ -795,9 +795,9 @@ class Pan123:
         if res_code_up == 0:
             pass
         else:
-            print(start_data)
-            print(start_res_json)
-            print("获取传输列表失败")
+            logger.error("start_data: %s", start_data)
+            logger.error("start_res_json: %s", start_res_json)
+            logger.error("获取传输列表失败")
             return
 
         # 分块，每一块取一次链接，依次上传
@@ -809,7 +809,8 @@ class Pan123:
                 data = f.read(block_size)
 
                 precent = round(put_size / fsize, 2) if fsize else 0
-                print("\r已上传：" + str(precent * 100) + "%", end="")
+                sys.stdout.write("\r已上传：" + str(precent * 100) + "%")
+                sys.stdout.flush()
                 put_size = put_size + len(data)
 
                 if not data:
@@ -837,7 +838,7 @@ class Pan123:
                 if res_code_up == 0:
                     pass
                 else:
-                    print("获取链接失败")
+                    logger.error("获取链接失败")
                     return
                 upload_url = get_link_res_json["data"]["presignedUrls"][
                     str(part_number_start)
@@ -846,7 +847,7 @@ class Pan123:
 
                 part_number_start = part_number_start + 1
 
-        print("\n处理中")
+        logger.info("处理中")
         uploaded_list_url = "https://www.123pan.com/b/api/file/s3_list_upload_parts"
         uploaded_comp_data = {
             "bucket": bucket,
@@ -883,10 +884,9 @@ class Pan123:
         close_res_json = close_up_session_res.json()
         res_code_up = close_res_json.get("code", -1)
         if res_code_up == 0:
-            print("上传成功")
+            logger.info("上传成功")
         else:
-            print("上传失败")
-            print(close_res_json)
+            logger.error("上传失败: %s", close_res_json)
             return
 
     # dirId 就是 fileNumber，从0开始，0为第一个文件，传入时需要减一 ！！！（好像文件夹都排在前面）
@@ -904,7 +904,7 @@ class Pan123:
                     self.get_dir()
                     self.show()
                 else:
-                    print("已经是根目录")
+                    logger.info("已经是根目录")
                 return
             if dir_num == "/":
                 self.all_file = False
@@ -917,14 +917,14 @@ class Pan123:
                 self.get_dir()
                 self.show()
                 return
-            print("输入错误")
+            logger.warning("输入错误")
             return
         dir_num = int(dir_num) - 1
         if dir_num > (len(self.list) - 1) or dir_num < 0:
-            print("输入错误")
+            logger.warning("输入错误")
             return
         if self.list[dir_num]["Type"] != 1:
-            print("不是文件夹")
+            logger.warning("不是文件夹")
             return
 
         self.all_file = False
@@ -966,9 +966,9 @@ class Pan123:
             authorization = config.get("authorization", authorization)
 
         except Exception:
-            print("获取配置失败，重新输入")
+            logger.warning("获取配置失败，重新输入")
 
-            if user_name == "" or pass_word == "":
+            if user_name == "" or pass_word == "": 
                 if input_pwd:
                     user_name = input("userName:")
                     pass_word = input("passWord:")
@@ -984,7 +984,7 @@ class Pan123:
         if not remakedir:
             for i in self.list:
                 if i["FileName"] == dirname:
-                    print("文件夹已存在")
+                    logger.info("文件夹已存在")
                     return i["FileId"]
 
         url = "https://www.123pan.com/a/api/file/upload_request"
@@ -1009,17 +1009,17 @@ class Pan123:
         try:
             res_json = res_mk.json()
         except json.decoder.JSONDecodeError:
-            print("创建失败")
-            print(res_mk.text)
+            logger.error("创建失败")
+            logger.error("res_mk.text: %s", res_mk.text)
             return
         code_mkdir = res_json.get("code", -1)
 
         if code_mkdir == 0:
-            print("创建成功: ", res_json["data"]["FileId"])
+            logger.info("创建成功: %s", res_json["data"]["FileId"])
             self.get_dir()
             return res_json["data"]["Info"]["FileId"]
-        print(res_json)
-        print("创建失败")
+        logger.error("mkdir failed: %s", res_json)
+        logger.error("创建失败")
         return
 
 # 线程辅助
@@ -1055,14 +1055,14 @@ class LoginDialog(QtWidgets.QDialog):
         self.setWindowTitle("登录123云盘")
         self.setModal(True)
         self.resize(420, 150)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        #self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         layout = QtWidgets.QVBoxLayout(self)
 
         form = QtWidgets.QFormLayout()
         self.le_user = QtWidgets.QLineEdit()
         self.le_pass = QtWidgets.QLineEdit()
-        self.le_pass.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.le_pass.setEchoMode(QLineEdit.EchoMode.Password)
         form.addRow("用户名：", self.le_user)
         form.addRow("密码：", self.le_pass)
         layout.addLayout(form)
@@ -1091,7 +1091,7 @@ class LoginDialog(QtWidgets.QDialog):
         if not user or not pwd:
             QtWidgets.QMessageBox.information(self, "提示", "请输入用户名和密码。")
             return
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
         try:
             # 构造123pan并登录
             try:
@@ -1129,7 +1129,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("123云盘")
         self.resize(980, 620)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        #self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         self.pan = None
         self.threadpool = QtCore.QThreadPool.globalInstance()
@@ -1192,10 +1192,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # 文件列表表格
         self.table = QtWidgets.QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["编号", "名称", "类型", "大小"])
-        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.doubleClicked.connect(self.on_table_double)
-        self.table.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.table.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.on_table_context_menu)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -1273,7 +1273,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_settings(self):
         """打开设置对话框"""
         dlg = SettingsDialog(self)
-        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.Accepted:
             settings = dlg.get_settings()
             # 保存设置到配置文件
             config = ConfigManager.load_config()
@@ -1297,7 +1297,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if not cfg_loaded:
             dlg = LoginDialog(self)
-            if dlg.exec_() != QtWidgets.QDialog.Accepted:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
                 QtWidgets.QMessageBox.information(self, "提示", "未登录，程序将退出。")
                 QtCore.QTimer.singleShot(0, self.close)
                 return
@@ -1384,7 +1384,7 @@ class MainWindow(QtWidgets.QMainWindow):
         a_link = menu.addAction("显示链接")
         a_delete = menu.addAction("删除")
         a_share = menu.addAction("分享")
-        action = menu.exec_(self.table.viewport().mapToGlobal(pos))
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
         self.table.selectRow(row)
         if action == a_download:
             self.on_download()
@@ -1507,7 +1507,7 @@ class MainWindow(QtWidgets.QMainWindow):
         h.addWidget(btn_copy)
         h.addWidget(btn_close)
         v.addLayout(h)
-        dlg.exec_()
+        dlg.exec()
 
     def on_upload(self):
         if not self.pan:
@@ -1692,8 +1692,7 @@ def main():
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
     w.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
-

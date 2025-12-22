@@ -1,0 +1,3 @@
+#!/bin/bash
+python -m pip install -r requirements.txt
+python -m PyInstaller --onefile --windowed --icon=icon.ico --clean --exclude-module=PyQt6.QtWebEngine 123pan.py
