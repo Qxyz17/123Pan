@@ -1,3 +1,6 @@
+# https://github.com/Qxyz17/123pan
+# src/sign_py.py
+
 import time
 import random
 from datetime import datetime

@@ -1,3 +1,6 @@
+# https://github.com/Qxyz17/123pan
+# src/logging_config.py
+
 import logging
 from logging.handlers import RotatingFileHandler
 import os
