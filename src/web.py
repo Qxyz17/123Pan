@@ -7,7 +7,6 @@ import os
 import json
 import base64
 
-
 class Pan123:
     def __init__(
             self,
