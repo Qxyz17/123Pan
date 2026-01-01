@@ -36,10 +36,10 @@ jobs:
       - name: Build with PyInstaller
         working-directory: src
         run: |
-          pyinstaller ^
-            --onefile ^
-            --name 123pan ^
-            --icon icon.ico ^
+          pyinstaller \
+            --onefile \
+            --name 123pan \
+            --icon icon.ico \
             123pan.py
         shell: bash
 
