@@ -76,4 +76,3 @@ jobs:
           files: |
             artifacts/123pan-windows/*
             artifacts/123pan-linux/*
-          prerelease: true
