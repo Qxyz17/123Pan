@@ -24,7 +24,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
 
       - name: Install dependencies
         working-directory: src
@@ -38,6 +38,7 @@ jobs:
         run: |
           pyinstaller \
             --onefile \
+            --windowed \
             --name 123pan-dev \
             --icon icon.ico \
             123pan.py
