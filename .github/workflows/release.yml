@@ -38,6 +38,7 @@ jobs:
         run: |
           pyinstaller \
             --onefile \
+            --windowed \
             --name 123pan \
             --icon icon.ico \
             123pan.py
