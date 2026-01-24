@@ -1,9 +1,9 @@
-name: Autobuild (Dev)
+name: Build & Release 123pan
 
 on:
   push:
-    branches:
-      - dev
+    tags:
+      - "v*"
 
 permissions:
   contents: write
@@ -42,7 +42,7 @@ jobs:
             --assume-yes-for-downloads \
             --lto=yes \
             --python-flag=no_site \
-            --output-filename=123pan-dev \
+            --output-filename=123pan \
             --windows-icon-from-ico=icon.ico
         shell: bash
 
@@ -52,7 +52,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: 123pan-windows
-          path: src/123pan-dev.exe
+          path: src/123pan.exe
 
       # Linux
       - name: Upload Linux artifact
@@ -60,45 +60,22 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: 123pan-linux
-          path: src/123pan-dev
+          path: src/123pan
 
   release:
-    name: Publish Autobuild Release
+    name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Delete old autobuild tag
-        run: |
-          git push origin :refs/tags/autobuild || true
-
-      - name: Create autobuild tag
-        run: |
-          git tag autobuild
-          git push origin autobuild --force
-
-      - name: Publish Autobuild (Pre-release)
+      - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: autobuild
-          name: Autobuild (测试版)
-          prerelease: true
-          body: |
-            ⚠️ **这是自动构建的测试版本（Autobuild）**
-            
-            - 来自 `dev` 分支的最新提交
-            - 可能不稳定，仅用于测试
-            - 每次 dev 更新都会自动覆盖此版本
-
-            Commit: ${{ github.sha }}
           files: |
             artifacts/123pan-windows/*
             artifacts/123pan-linux/*
