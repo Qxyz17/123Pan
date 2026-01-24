@@ -1,16 +1,24 @@
-name: Autobuild (Dev)
+name: Build & Release
 
 on:
   workflow_dispatch:
     inputs:
+      build_type:
+        description: 'Build Type (构建类型)'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev  # 测试版
+          - release  # 正式版
       release_type:
-        description: 'Release Type'
+        description: 'Release Type (发布类型)'
         required: true
         default: 'build'
         type: choice
         options:
-          - build
-          - autorelease
+          - build  # 仅构建
+          - autorelease  # 构建并发布
 
 permissions:
   contents: write
@@ -38,40 +46,69 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install nuitka zstandard
+          if [ "${{ github.event.inputs.build_type }}" = "dev" ]; then
+            pip install pyinstaller
+          else
+            pip install nuitka zstandard
+          fi
 
-      - name: Build with Nuitka
+      - name: Build (Dev 测试版 - PyInstaller)
+        if: github.event.inputs.build_type == 'dev'
+        working-directory: src
+        run: |
+          pyinstaller \
+            --onefile \
+            --name 123pan-dev \
+            --icon icon.ico \
+            123pan.py
+        shell: bash
+
+      - name: Build (Release 正式版 - Nuitka)
+        if: github.event.inputs.build_type == 'release'
         working-directory: src
         run: |
           python -m nuitka 123pan.py \
             --onefile \
-            --windows-console-mode=disable\
-            --enable-plugin=pyqt6\
+            --windows-disable-console\
             --assume-yes-for-downloads \
             --lto=yes \
             --python-flag=no_site \
-            --output-filename=123pan-dev \
+            --output-filename=123pan \
             --windows-icon-from-ico=icon.ico
         shell: bash
 
-      # Windows
-      - name: Upload Windows artifact
-        if: runner.os == 'Windows'
+      # Windows artifact upload
+      - name: Upload Windows artifact (Dev)
+        if: runner.os == 'Windows' && github.event.inputs.build_type == 'dev'
         uses: actions/upload-artifact@v4
         with:
           name: 123pan-windows
-          path: src/123pan-dev.exe
+          path: src/dist/123pan-dev.exe
 
-      # Linux
-      - name: Upload Linux artifact
-        if: runner.os == 'Linux'
+      - name: Upload Windows artifact (Release)
+        if: runner.os == 'Windows' && github.event.inputs.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: 123pan-windows
+          path: src/123pan.exe
+
+      # Linux artifact upload
+      - name: Upload Linux artifact (Dev)
+        if: runner.os == 'Linux' && github.event.inputs.build_type == 'dev'
         uses: actions/upload-artifact@v4
         with:
           name: 123pan-linux
-          path: src/123pan-dev
+          path: src/dist/123pan-dev
+
+      - name: Upload Linux artifact (Release)
+        if: runner.os == 'Linux' && github.event.inputs.build_type == 'release'
+        uses: actions/upload-artifact@v4
+        with:
+          name: 123pan-linux
+          path: src/123pan
 
   release:
-    name: Publish Autobuild Release
+    name: Publish Release
     needs: build
     runs-on: ubuntu-latest
     if: github.event.inputs.release_type == 'autorelease'
@@ -85,20 +122,22 @@ jobs:
         with:
           path: artifacts
 
-      - name: Delete old autobuild tag
+      - name: Publish Dev Release (测试版)
+        if: github.event.inputs.build_type == 'dev'
         run: |
+          # Delete old autobuild tag
           git push origin :refs/tags/autobuild || true
-
-      - name: Create autobuild tag
-        run: |
+          # Create new autobuild tag
           git tag autobuild
           git push origin autobuild --force
+        shell: bash
 
-      - name: Publish Autobuild (Pre-release)
+      - name: Publish Release (测试版)
+        if: github.event.inputs.build_type == 'dev'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: autobuild
-          name: Autobuild (测试版)
+          name: Autobuild (Dev / 测试版)
           prerelease: true
           body: |
             ⚠️ **这是自动构建的测试版本（Autobuild）**
@@ -108,6 +147,14 @@ jobs:
             - 每次 main 更新都会自动覆盖此版本
 
             Commit: ${{ github.sha }}
+          files: |
+            artifacts/123pan-windows/*
+            artifacts/123pan-linux/*
+
+      - name: Publish Stable Release (正式版)
+        if: github.event.inputs.build_type == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
           files: |
             artifacts/123pan-windows/*
             artifacts/123pan-linux/*
