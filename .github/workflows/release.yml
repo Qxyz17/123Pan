@@ -38,6 +38,7 @@ jobs:
         run: |
           python -m nuitka 123pan.py \
             --onefile \
+            --windows-disable-console\
             --assume-yes-for-downloads \
             --lto=yes \
             --python-flag=no_site \
