@@ -1,9 +1,16 @@
 name: Build & Release 123pan
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      release_type:
+        description: 'Release Type'
+        required: true
+        default: 'build'
+        type: choice
+        options:
+          - build
+          - autorelease
 
 permissions:
   contents: write
@@ -66,6 +73,7 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    if: github.event.inputs.release_type == 'autorelease'
 
     steps:
       - name: Download artifacts
