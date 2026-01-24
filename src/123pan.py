@@ -1,4 +1,5 @@
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtWidgets import QLineEdit,QDialog
 import sys
 import os
 import hashlib
@@ -9,6 +10,8 @@ import random
 import re
 import uuid
 import platform
+
+VERSION = str("3.1.2_BETA")
 
 # 配置文件路径
 if platform.system() == 'Windows':
@@ -79,7 +82,7 @@ class SettingsDialog(QtWidgets.QDialog):
         self.setWindowTitle("设置")
         self.setModal(True)
         self.resize(500, 200)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        #self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
         
         layout = QtWidgets.QVBoxLayout(self)
         
@@ -1055,14 +1058,14 @@ class LoginDialog(QtWidgets.QDialog):
         self.setWindowTitle("登录123云盘")
         self.setModal(True)
         self.resize(420, 150)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        #self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         layout = QtWidgets.QVBoxLayout(self)
 
         form = QtWidgets.QFormLayout()
         self.le_user = QtWidgets.QLineEdit()
         self.le_pass = QtWidgets.QLineEdit()
-        self.le_pass.setEchoMode(QtWidgets.QLineEdit.Password)
+        self.le_pass.setEchoMode(QLineEdit.EchoMode.Password)
         form.addRow("用户名：", self.le_user)
         form.addRow("密码：", self.le_pass)
         layout.addLayout(form)
@@ -1091,7 +1094,7 @@ class LoginDialog(QtWidgets.QDialog):
         if not user or not pwd:
             QtWidgets.QMessageBox.information(self, "提示", "请输入用户名和密码。")
             return
-        QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
+        #QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.WaitCursor)
         try:
             # 构造123pan并登录
             try:
@@ -1129,7 +1132,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setWindowTitle("123云盘")
         self.resize(980, 620)
-        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
+        #self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowContextHelpButtonHint)
 
         self.pan = None
         self.threadpool = QtCore.QThreadPool.globalInstance()
@@ -1166,10 +1169,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_link = QtWidgets.QPushButton("显示链接")
         self.btn_upload = QtWidgets.QPushButton("上传文件")
         self.btn_mkdir = QtWidgets.QPushButton("新建文件夹")
+        self.btn_about = QtWidgets.QPushButton("关于")
 
         # 设置按钮最小宽度统一外观
         btns = [self.btn_refresh, self.btn_more, self.btn_up, self.btn_download, self.btn_link,
-                self.btn_upload, self.btn_mkdir, self.btn_delete, self.btn_share]
+                self.btn_upload, self.btn_mkdir, self.btn_delete, self.btn_share, self.btn_about]
         for b in btns:
             b.setMinimumHeight(30)
             b.setMinimumWidth(110)
@@ -1192,10 +1196,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # 文件列表表格
         self.table = QtWidgets.QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["编号", "名称", "类型", "大小"])
-        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.table.setEditTriggers(QtWidgets.QAbstractItemView.NoEditTriggers)
+        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self.table.doubleClicked.connect(self.on_table_double)
-        self.table.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
+        self.table.setContextMenuPolicy(QtCore.Qt.ContextMenuPolicy.CustomContextMenu)
         self.table.customContextMenuRequested.connect(self.on_table_context_menu)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setStretchLastSection(True)
@@ -1216,6 +1220,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_mkdir.clicked.connect(self.on_mkdir)
         self.btn_delete.clicked.connect(self.on_delete)
         self.btn_share.clicked.connect(self.on_share)
+        self.btn_about.clicked.connect(self.about)
 
         # 启动登录流程
         self.startup_login_flow()
@@ -1273,7 +1278,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def on_settings(self):
         """打开设置对话框"""
         dlg = SettingsDialog(self)
-        if dlg.exec_() == QtWidgets.QDialog.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.accepted:
             settings = dlg.get_settings()
             # 保存设置到配置文件
             config = ConfigManager.load_config()
@@ -1297,7 +1302,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if not cfg_loaded:
             dlg = LoginDialog(self)
-            if dlg.exec_() != QtWidgets.QDialog.Accepted:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
                 QtWidgets.QMessageBox.information(self, "提示", "未登录，程序将退出。")
                 QtCore.QTimer.singleShot(0, self.close)
                 return
@@ -1384,7 +1389,7 @@ class MainWindow(QtWidgets.QMainWindow):
         a_link = menu.addAction("显示链接")
         a_delete = menu.addAction("删除")
         a_share = menu.addAction("分享")
-        action = menu.exec_(self.table.viewport().mapToGlobal(pos))
+        action = menu.exec(self.table.viewport().mapToGlobal(pos))
         self.table.selectRow(row)
         if action == a_download:
             self.on_download()
@@ -1507,7 +1512,7 @@ class MainWindow(QtWidgets.QMainWindow):
         h.addWidget(btn_copy)
         h.addWidget(btn_close)
         v.addLayout(h)
-        dlg.exec_()
+        dlg.exec()
 
     def on_upload(self):
         if not self.pan:
@@ -1688,12 +1693,14 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         event.accept()
 
+    def about(self):
+        QtWidgets.QMessageBox.information(self, "关于", f'<a href="https://github.com/Qxyz17/123pan">123pan</a>, VERSION: {VERSION}')
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
     w.show()
-    sys.exit(app.exec_())
+    sys.exit(app.exec())
 
 if __name__ == "__main__":
     main()
-
