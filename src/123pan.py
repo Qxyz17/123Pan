@@ -1376,8 +1376,8 @@ class MainWindow(QtWidgets.QMainWindow):
             except Exception as e:
                 self._show_error("进入文件夹失败: " + str(e))
         else:
-            ret = QtWidgets.QMessageBox.question(self, "下载", "是否下载所选文件？", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-            if ret == QtWidgets.QMessageBox.Yes:
+            ret = QtWidgets.QMessageBox.question(self, "下载", "是否下载所选文件？", QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+            if ret == QtWidgets.QMessageBox.StandardButton.Yes:
                 self.on_download()
 
     def on_table_context_menu(self, pos):
@@ -1642,8 +1642,8 @@ class MainWindow(QtWidgets.QMainWindow):
         file_index, file_detail = self.get_selected_detail()
         if file_detail is None:
             return
-        r = QtWidgets.QMessageBox.question(self, "删除确认", f"确认将 '{file_detail['FileName']}' 删除？", QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No)
-        if r == QtWidgets.QMessageBox.No:
+        r = QtWidgets.QMessageBox.question(self, "删除确认", f"确认将 '{file_detail['FileName']}' 删除？", QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
+        if r == QtWidgets.QMessageBox.StandardButton.No:
             return
         try:
             self.pan.delete_file(file_index, by_num=True, operation=True)
