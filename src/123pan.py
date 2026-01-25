@@ -9,6 +9,9 @@ import random
 import re
 import uuid
 import platform
+from log import get_logger
+
+logger = get_logger(__name__)
 
 # 配置文件路径
 if platform.system() == 'Windows':
@@ -50,7 +53,7 @@ class ConfigManager:
                         config["settings"] = default_config["settings"]
                     return config
             except Exception as e:
-                print(f"加载配置失败: {e}")
+                logger.error(f"加载配置失败: {e}")
                 return default_config
         return default_config
     
@@ -63,7 +66,7 @@ class ConfigManager:
                 json.dump(config, f, indent=2, ensure_ascii=False)
             return True
         except Exception as e:
-            print(f"保存配置失败: {e}")
+            logger.error(f"保存配置失败: {e}")
             return False
     
     @staticmethod
@@ -267,7 +270,7 @@ class Pan123:
             self.read_ini(user_name, pass_word, input_pwd, authorization)
         else:
             if user_name == "" or pass_word == "":
-                print("读取已禁用，用户名或密码为空")
+                logger.warning("读取已禁用，用户名或密码为空")
                 if input_pwd:
                     user_name = input("请输入用户名:")
                     pass_word = input("请输入密码:")
@@ -308,8 +311,8 @@ class Pan123:
         res_sign = login_res.json()
         res_code_login = res_sign["code"]
         if res_code_login != 200:
-            print("code = 1 Error:" + str(res_code_login))
-            print(res_sign.get("message", ""))
+            logger.error("code = 1 Error:" + str(res_code_login))
+            logger.error(res_sign.get("message", ""))
             return res_code_login
         set_cookies = login_res.headers.get("Set-Cookie", "")
         set_cookies_list = {}
@@ -341,9 +344,9 @@ class Pan123:
                 "osVersion": self.osversion,
             })
             ConfigManager.save_config(config)
-            print("账号已保存")
+            logger.info("账号已保存")
         except Exception as e:
-            print("保存账号失败:", e)
+            logger.error("保存账号失败:", e)
 
     def get_dir(self, save=True):
         return self.get_dir_by_id(self.parent_file_id, save)
@@ -380,13 +383,13 @@ class Pan123:
             try:
                 a = requests.get(base_url, headers=self.header_logined, params=params, timeout=30)
             except Exception:
-                print("连接失败")
+                logger.error("连接失败")
                 return -1, []
             text = a.json()
             res_code_getdir = text["code"]
             if res_code_getdir != 0:
-                print("code = 2 Error:" + str(res_code_getdir))
-                print(text.get("message", ""))
+                logger.error("code = 2 Error:" + str(res_code_getdir))
+                logger.error(text.get("message", ""))
                 return res_code_getdir, []
             lists_page = text["data"]["InfoList"]
             lists += lists_page
@@ -395,13 +398,12 @@ class Pan123:
             page += 1
             times += 1
             if times % 5 == 0:
-                print("警告：文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
-                print("为防止对服务器造成影响，暂停3秒")
-                print("请耐心等待！")
+                logger.warning("警告：文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
+                logger.info("为防止对服务器造成影响，暂停3秒")
                 time.sleep(3)
 
         if lenth_now < total:
-            print("文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
+            logger.warning("文件夹内文件过多：" + str(lenth_now) + "/" + str(total))
             self.all_file = False
         else:
             self.all_file = True
@@ -413,7 +415,6 @@ class Pan123:
         return res_code_getdir, lists
 
     def show(self):
-        print("--------------------")
         for i in self.list:
             file_size = i["Size"]
             if file_size > 1073741824:
@@ -424,7 +425,7 @@ class Pan123:
                 download_size_print = str(round(file_size / 1024, 2)).ljust(6) + " KB"
 
             if i["Type"] == 0:
-                print(
+                logger.debug(
                     "\033[33m" + "编号:",
                     self.list.index(i) + 1,
                     "\033[0m \t\t" + download_size_print + "\t\t\033[36m",
@@ -432,7 +433,7 @@ class Pan123:
                     "\033[0m",
                 )
             elif i["Type"] == 1:
-                print(
+                logger.debug(
                     "\033[35m" + "编号:",
                     self.list.index(i) + 1,
                     " \t\t\033[36m",
@@ -440,9 +441,7 @@ class Pan123:
                     "\033[0m",
                 )
         if not self.all_file:
-            print("剩余" + str(self.total - len(self.list)) + "个文件未获取")
-            print("输入more继续获取")
-        print("--------------------")
+            logger.info("剩余" + str(self.total - len(self.list)) + "个文件未获取")
 
     # fileNumber 从0开始，0为第一个文件，传入时需要减一 
     def link_by_number(self, file_number, showlink=True):
@@ -477,22 +476,22 @@ class Pan123:
         link_res_json = link_res.json()
         res_code_download = link_res_json["code"]
         if res_code_download != 0:
-            print("code = 3 Error:" + str(res_code_download))
-            print(link_res_json.get("message", ""))
+            logger.error("code = 3 Error:" + str(res_code_download))
+            logger.debug(link_res_json.get("message", ""))
             return res_code_download
         down_load_url = link_res.json()["data"]["DownloadUrl"]
         next_to_get = requests.get(down_load_url, timeout=10, allow_redirects=False).text
         url_pattern = re.compile(r"href='(https?://[^']+)'")
         redirect_url = url_pattern.findall(next_to_get)[0]
         if showlink:
-            print(redirect_url)
+            logger.debug(redirect_url)
 
         return redirect_url
 
     def download(self, file_number, download_path="download"):
         file_detail = self.list[file_number]
         if file_detail["Type"] == 1:
-            print("开始下载")
+            logger.info("开始下载")
             file_name = file_detail["FileName"] + ".zip"
         else:
             file_name = file_detail["FileName"]  # 文件名
@@ -502,10 +501,11 @@ class Pan123:
             return
         self.download_from_url(down_load_url, file_name, download_path)
 
+    #考虑删除，但目前有依赖，不要动这里
     def download_from_url(self, url, file_name, download_path="download"):
         if os.path.exists(download_path + "/" + file_name):
             if self.download_mode == 4:
-                print("文件 " + file_name + "已跳过")
+                logger.info("文件 " + file_name + "已跳过")
                 return
             print("文件 " + file_name + " 已存在，是否要覆盖？")
             sure_download = input("输入1覆盖，2跳过，3全部覆盖，4全部跳过：")
@@ -521,7 +521,7 @@ class Pan123:
                 os.remove(download_path + "/" + file_name)
 
         if not os.path.exists(download_path):
-            print("文件夹不存在，创建文件夹")
+            logger.info("文件夹不存在，创建文件夹")
             os.makedirs(download_path)
         down = requests.get(url, stream=True, timeout=10)
 
@@ -568,6 +568,7 @@ class Pan123:
                         end="",
                     )
                 elif data_count == content_size:
+                    #Qxyz17说让我不动
                     print("\r [%s%s] %d%%  %s" % (50 * "█", "", 100, ""), end="")
             print("\nok")
 
@@ -590,7 +591,7 @@ class Pan123:
     def download_dir(self, file_detail, download_path_root="download"):
         self.name_dict[file_detail["FileId"]] = file_detail["FileName"]
         if file_detail["Type"] != 1:
-            print("不是文件夹")
+            logger.warning("不是文件夹")
             return
 
         all_list = self.get_dir_by_id(file_detail["FileId"], save=False, all=True, limit=100)[1]
@@ -620,6 +621,7 @@ class Pan123:
         self.recycle_list = recycle_list
 
     # fileNumber 从0开始，0为第一个文件，传入时需要减一
+    # 不要乱动，之后考虑移除
     def delete_file(self, file, by_num=True, operation=True):
         # operation = 'true' 删除 ， operation = 'false' 恢复
         if by_num:

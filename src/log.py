@@ -1,0 +1,42 @@
+import logging
+import platform
+import os
+
+# 配置文件路径
+if platform.system() == 'Windows':
+    CONFIG_DIR = os.path.join(os.environ.get('APPDATA', ''), 'Qxyz17', '123pan')
+else:
+    CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'Qxyz17', '123pan')
+LOG_FILE = os.path.join(CONFIG_DIR, '123pan.log')
+
+
+def get_logger(name: str = "123pan"):
+    logger = logging.getLogger(name)
+    logger.setLevel(logging.DEBUG)
+    #logger.setLevel(logging.INFO)
+
+    # 防止重复添加 handler
+    if not logger.handlers:
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+
+        file_handler = logging.FileHandler(LOG_FILE, encoding='utf-8')
+        file_handler.setFormatter(formatter)
+
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(formatter)
+
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+
+    return logger
+
+'''
+调用方法：在其他文件中
+from log import get_logger
+logger = get_logger(__name__)
+然后需要时（例子↓）
+logger.info("xxx")
+发布版本时把debug级别的那一行注释掉改为info的那一行
+'''
