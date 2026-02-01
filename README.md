@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icon.ico" alt="123pan" width="120" height="120">
+  <img src="src/icon.ico" alt="123pan" width="120" height="120">
   
   # 🚀 123pan
   
@@ -11,33 +11,27 @@
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.8%2B-blue?style=for-the-badge&logo=python" alt="Python Version"></a>
     <a href="https://github.com/Qxyz17/123pan/releases"><img src="https://img.shields.io/github/downloads/Qxyz17/123pan/total?style=for-the-badge&color=orange" alt="Downloads"></a>
   </div>
-  
+  <br>
+  <img src="./doc/img/image.png" width="600"><img>
+
 </div>
 
 ---
 
 ## 📖 项目介绍
 
-[项目地址](https://github.com/Qxyz17/123pan)
-
 123pan是一款基于Python开发的高效下载辅助工具，通过模拟安卓客户端协议，帮助用户绕过123云盘的自用下载流量限制，实现无阻碍下载体验。
-
-工具提供两种使用方式（安卓协议/网页协议），支持文件管理全流程操作，适用于需要下载云盘文件的用户。
 
 ---
 
 ## ✨ 功能
 
-| 功能 | 支持协议 |
-|------|----------|
-| 🔑 账号登录 | 安卓/网页 |
-| 📂 文件浏览 | 安卓/网页 |
-| 💾 高速下载 | 安卓协议 |
-| 📤 文件上传 | 安卓协议 |
-| 🔗 生成链接 | 安卓/网页 |
-| 🗑️ 文件管理 | 安卓/网页 |
-
-> ⚠️ 注意：网页协议已停止更新且受流量限制，**强烈推荐使用安卓协议**
+- 🔑 账号登录
+- 📂 文件浏览
+- 💾 高速下载
+- 📤 文件上传
+- 🔗 生成链接 
+- 🗑️ 文件管理 
 
 ---
 
@@ -91,11 +85,7 @@
 ---
 
 ## 待开发功能
-- [x] 更换qt5为qt6
-- [ ] 退出登录
-- [ ] 文件拖拽上传
-- [ ] 拖拽上传功能
-- [x] 界面美化
+？
 
 ## 🤝 贡献指南
 
