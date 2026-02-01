@@ -20,6 +20,22 @@ else:
     CONFIG_DIR = os.path.join(os.path.expanduser('~'), '.config', 'Qxyz17', '123pan')
 CONFIG_FILE = os.path.join(CONFIG_DIR, 'config.json')
 
+# 自定义侧栏按钮类
+class SidebarButton(QtWidgets.QPushButton):
+    """侧栏按钮，支持hover事件"""
+    entered = QtCore.pyqtSignal()
+    left = QtCore.pyqtSignal()
+    
+    def enterEvent(self, event):
+        """鼠标进入事件"""
+        super().enterEvent(event)
+        self.entered.emit()
+    
+    def leaveEvent(self, event):
+        """鼠标离开事件"""
+        super().leaveEvent(event)
+        self.left.emit()
+
 # 配置管理类
 class ConfigManager:
     @staticmethod
@@ -1042,7 +1058,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sidebar_original_geoms = {}
         
         # 文件页按钮
-        self.btn_files = QtWidgets.QPushButton("📁 文件")
+        self.btn_files = SidebarButton("📁 文件")
         self.btn_files.setMinimumHeight(50)
         self.btn_files.setStyleSheet(
             "font-size: 16px; text-align: left; padding-left: 20px;"
@@ -1054,7 +1070,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sidebar_buttons.append(self.btn_files)
         
         # 传输页按钮
-        self.btn_transfer = QtWidgets.QPushButton("🔄 传输")
+        self.btn_transfer = SidebarButton("🔄 传输")
         self.btn_transfer.setMinimumHeight(50)
         self.btn_transfer.setStyleSheet(
             "font-size: 16px; text-align: left; padding-left: 20px;"
@@ -1067,8 +1083,8 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 为侧边栏按钮添加悬停和点击事件，实现动画效果
         for btn in self.sidebar_buttons:
-            btn.enterEvent = lambda event, b=btn: self.on_sidebar_button_hover(b)
-            btn.leaveEvent = lambda event, b=btn: self.on_sidebar_button_leave(b)
+            btn.entered.connect(lambda b=btn: self.on_sidebar_button_hover(b))
+            btn.left.connect(lambda b=btn: self.on_sidebar_button_leave(b))
             btn.pressed.connect(lambda b=btn: self.on_sidebar_button_pressed(b))
             btn.released.connect(lambda b=btn: self.on_sidebar_button_released(b))
             
