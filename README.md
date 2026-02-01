@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="icon.ico" alt="123pan" width="120" height="120">
+  <img src="src/icon.ico" alt="123pan" width="120" height="120">
   
   # 🚀 123pan
   

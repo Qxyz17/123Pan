@@ -1,3 +1,6 @@
+# https://github.com/123panNextGen/123pan
+# src/log.py
+
 import logging
 import platform
 import os
@@ -34,12 +37,3 @@ def get_logger(name: str = "123pan"):
         logger.addHandler(console_handler)
 
     return logger
-
-'''
-调用方法：在其他文件中
-from log import get_logger
-logger = get_logger(__name__)
-然后需要时（例子↓）
-logger.info("xxx")
-发布版本时把debug级别的那一行注释掉改为info的那一行
-'''
