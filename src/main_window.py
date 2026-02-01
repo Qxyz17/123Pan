@@ -1,15 +1,109 @@
-"""主窗口模块"""
+# https://github.com/123panNextGen/123pan
+# src/main.window.py
+
 from PyQt6 import QtCore, QtGui, QtWidgets
 import os
 import json
 import hashlib
+import requests
+import sys
+import time
 from log import get_logger
 from config import ConfigManager
-from ui_widgets import SidebarButton, LoginDialog, SettingsDialog
+from ui_widgets import SidebarButton, LoginDialog, SettingsDialog, AboutDialog
 from api import Pan123
 from threading_utils import ThreadedTask
 
 logger = get_logger(__name__)
+
+
+class DropAreaTableWidget(QtWidgets.QTableWidget):
+    """支持拖拽上传的表格控件"""
+    files_dropped = QtCore.pyqtSignal(list)  # 信号：文件路径列表
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setAcceptDrops(True)
+        self.is_drag_over = False
+        # 设置 viewport 也接受拖拽
+        self.viewport().setAcceptDrops(True)
+        self.viewport().installEventFilter(self)
+    
+    def eventFilter(self, obj, event):
+        """事件过滤器，捕获 viewport 的拖拽事件"""
+        if obj == self.viewport():
+            if event.type() == QtCore.QEvent.Type.DragEnter:
+                return self.dragEnterEvent(event) or True
+            elif event.type() == QtCore.QEvent.Type.DragLeave:
+                self.dragLeaveEvent(event)
+                return True
+            elif event.type() == QtCore.QEvent.Type.DragMove:
+                if event.mimeData().hasUrls():
+                    has_files = any(
+                        os.path.isfile(url.toLocalFile()) 
+                        for url in event.mimeData().urls()
+                    )
+                    if has_files:
+                        event.acceptProposedAction()
+                        return True
+            elif event.type() == QtCore.QEvent.Type.Drop:
+                return self.dropEvent(event) or True
+        return super().eventFilter(obj, event)
+    
+    def dragEnterEvent(self, event):
+        """处理拖进事件"""
+        if event.mimeData().hasUrls():
+            # 检查是否有文件
+            has_files = any(
+                os.path.isfile(url.toLocalFile()) 
+                for url in event.mimeData().urls()
+            )
+            if has_files:
+                event.acceptProposedAction()
+                self.is_drag_over = True
+                # 高亮显示表格
+                self.setStyleSheet(self.styleSheet() + 
+                                 "\nQTableWidget { background-color: rgba(59, 130, 246, 0.15); border: 2px dashed rgba(59, 130, 246, 0.5); }")
+                return True
+            else:
+                event.ignore()
+        else:
+            event.ignore()
+        return False
+    
+    def dragLeaveEvent(self, event):
+        """处理拖出事件"""
+        if self.is_drag_over:
+            self.is_drag_over = False
+            # 恢复原样式
+            style = self.styleSheet()
+            # 移除高亮样式
+            style = style.replace("\nQTableWidget { background-color: rgba(59, 130, 246, 0.15); border: 2px dashed rgba(59, 130, 246, 0.5); }", "")
+            self.setStyleSheet(style)
+    
+    def dropEvent(self, event):
+        """处理放下事件"""
+        # 恢复原样式
+        if self.is_drag_over:
+            self.is_drag_over = False
+            style = self.styleSheet()
+            style = style.replace("\nQTableWidget { background-color: rgba(59, 130, 246, 0.15); border: 2px dashed rgba(59, 130, 246, 0.5); }", "")
+            self.setStyleSheet(style)
+        
+        files = []
+        for url in event.mimeData().urls():
+            file_path = url.toLocalFile()
+            if os.path.isfile(file_path):
+                files.append(file_path)
+        
+        if files:
+            logger.info(f"拖拽上传文件: {files}")
+            self.files_dropped.emit(files)
+            event.acceptProposedAction()
+            return True
+        else:
+            event.ignore()
+        return False
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -124,6 +218,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_settings.setObjectName("btn_settings")
         toolbar_h.addWidget(self.btn_settings)
         
+        # 退出登陆按钮
+        self.btn_logout = QtWidgets.QPushButton("🚪")
+        self.btn_logout.setToolTip("退出登陆")
+        self.btn_logout.setMinimumHeight(36)
+        self.btn_logout.setMinimumWidth(45)
+        self.btn_logout.setMaximumHeight(36)
+        self.btn_logout.setMaximumWidth(45)
+        self.btn_logout.setStyleSheet(
+            "font-size: 20px;"
+            "background-color: transparent;"
+            "border: none;"
+            "border-radius: 8px;"
+        )
+        self.btn_logout.setObjectName("btn_logout")
+        toolbar_h.addWidget(self.btn_logout)
+        
         # 操作按钮（横向排列）
         self.btn_refresh = QtWidgets.QPushButton("刷新")
         self.btn_more = QtWidgets.QPushButton("更多")
@@ -135,6 +245,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_upload = QtWidgets.QPushButton("上传文件")
         self.btn_mkdir = QtWidgets.QPushButton("新建文件夹")
 
+        # 关于按钮
+        self.btn_about = QtWidgets.QPushButton("ℹ️")
+        self.btn_about.setToolTip("关于")
+        self.btn_about.setMinimumHeight(36)
+        self.btn_about.setMinimumWidth(45)
+        self.btn_about.setMaximumHeight(36)
+        self.btn_about.setMaximumWidth(45)
+        self.btn_about.setStyleSheet(
+            "font-size: 20px;"
+            "background-color: transparent;"
+            "border: none;"
+            "border-radius: 8px;"
+        )
+        self.btn_about.setObjectName("btn_about")
+        toolbar_h.addWidget(self.btn_about)
+        
         # 设置按钮最小宽度统一外观
         btns = [self.btn_refresh, self.btn_more, self.btn_up, self.btn_download, self.btn_link,
                 self.btn_upload, self.btn_mkdir, self.btn_delete, self.btn_share]
@@ -185,8 +311,8 @@ class MainWindow(QtWidgets.QMainWindow):
         file_list_layout = QtWidgets.QVBoxLayout(file_list_widget)
         file_list_layout.setContentsMargins(0, 0, 0, 0)
         
-        # 文件列表表格
-        self.table = QtWidgets.QTableWidget(0, 5)
+        # 文件列表表格（支持拖拽上传）
+        self.table = DropAreaTableWidget(0, 5)
         self.table.setHorizontalHeaderLabels(["", "编号", "名称", "类型", "大小"])
         self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
         self.table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -195,6 +321,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.table.customContextMenuRequested.connect(self.on_table_context_menu)
         self.table.verticalHeader().setVisible(False)
         self.table.horizontalHeader().setStretchLastSection(True)
+        # 连接拖拽上传信号
+        self.table.files_dropped.connect(self.on_files_dropped)
         file_list_layout.addWidget(self.table, stretch=1)
         
         # 加载动画布局
@@ -272,6 +400,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # 信号连接
         self.btn_settings.clicked.connect(self.on_settings)
+        self.btn_logout.clicked.connect(self.on_logout)
         self.btn_refresh.clicked.connect(lambda: self.refresh_file_list(reset_page=True))
         self.btn_more.clicked.connect(lambda: self.refresh_file_list(reset_page=False))
         self.btn_up.clicked.connect(self.on_up)
@@ -289,9 +418,12 @@ class MainWindow(QtWidgets.QMainWindow):
         # 初始化默认页面
         self.switch_page(0)
 
+
+        # 关于按钮信号
+        self.btn_about.clicked.connect(self.on_about)
+        
         # 启动登录流程
         self.startup_login_flow()
-
     def apply_blue_white_theme(self):
         """
         123云盘主题样式表 - iOS 26 Liquid Glass 液态毛玻璃效果
@@ -531,7 +663,114 @@ class MainWindow(QtWidgets.QMainWindow):
             config["settings"] = settings
             ConfigManager.save_config(config)
             QtWidgets.QMessageBox.information(self, "设置", "设置已保存")
+    
+    def on_logout(self):
+        """退出登陆"""
+        reply = QtWidgets.QMessageBox.question(
+            self, "退出登陆", "确定要退出登陆吗？",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No
+        )
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            # 清除配置文件中的登陆信息
+            config = ConfigManager.load_config()
+            config["userName"] = ""
+            config["passWord"] = ""
+            config["authorization"] = ""
+            ConfigManager.save_config(config)
+            
+            # 清空当前登陆状态
+            self.pan = None
+            
+            # 显示登陆对话框
+            dlg = LoginDialog(self)
+            if dlg.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+                QtWidgets.QMessageBox.information(self, "提示", "未登录，程序将退出。")
+                QtCore.QTimer.singleShot(0, self.close)
+                return
+            self.pan = dlg.get_pan()
+            self.refresh_file_list(reset_page=True)
+            QtWidgets.QMessageBox.information(self, "提示", "登陆成功")
+    
+    def on_files_dropped(self, files):
+        """处理拖拽上传的文件"""
+        logger.info(f"收到拖拽上传请求，文件数: {len(files)}")
+        if not self.pan:
+            logger.warning("未登录，无法上传")
+            QtWidgets.QMessageBox.information(self, "提示", "请先登录。")
+            return
+        
+        # 逐个上传文件
+        for file_path in files:
+            self._upload_single_file(file_path)
+    
+    def _upload_single_file(self, file_path):
+        """上传单个文件"""
+        logger.info(f"准备上传文件: {file_path}")
+        if not os.path.isfile(file_path):
+            logger.warning(f"文件不存在: {file_path}")
+            return
+        
+        fname = os.path.basename(file_path)
+        file_size = os.path.getsize(file_path)
+        logger.info(f"文件信息 - 名称: {fname}, 大小: {file_size} 字节")
+        same = [i for i in self.pan.list if i.get("FileName") == fname]
+        dup_choice = 1
+        
+        if same:
+            text, ok = QtWidgets.QInputDialog.getText(
+                self, "同名文件", 
+                f"检测到同名文件: {fname}\n输入行为: 1 覆盖; 2 保留两者; 0 取消（默认1）", 
+                text="1"
+            )
+            if not ok:
+                return
+            if text.strip() not in ("0", "1", "2"):
+                QtWidgets.QMessageBox.information(self, "提示", "无效的选择，已取消")
+                return
+            if text.strip() == "0":
+                return
+            dup_choice = int(text.strip())
+        
+        # 添加传输任务
+        task_id = self.add_transfer_task("上传", fname, file_size)
+        
+        task = ThreadedTask(self._task_upload_file, file_path, dup_choice, task_id)
+        
+        # 保存任务对象引用
+        for i, t in enumerate(self.transfer_tasks):
+            if t["id"] == task_id:
+                self.transfer_tasks[i]["threaded_task"] = task
+                break
+        
+        self.active_tasks[task_id] = task
+        
+        def on_task_finished(tid):
+            if tid in self.active_tasks:
+                del self.active_tasks[tid]
+        
+        task.signals.progress.connect(lambda p, tid=task_id: (
+            self.status.showMessage(f"上传进度: {p}%", 2000),
+            self.update_transfer_task(tid, p, "上传中")
+        ))
+        task.signals.result.connect(lambda r, tid=task_id: (
+            self.status.showMessage("上传完成", 3000),
+            self.update_transfer_task(tid, 100, "已完成"),
+            on_task_finished(tid),
+            self.refresh_file_list(reset_page=False)
+        ))
+        task.signals.error.connect(lambda e, tid=task_id: (
+            self.status.showMessage(f"上传出错: {e}", 3000),
+            self.update_transfer_task(tid, 0, "失败"),
+            on_task_finished(tid)
+        ))
+        
+        self.threadpool.start(task)
 
+    def on_about(self):
+        """打开关于对话框"""
+        dlg = AboutDialog(self)
+        dlg.exec()
+    
     def startup_login_flow(self):
         cfg_loaded = False
         config = ConfigManager.load_config()

@@ -1,7 +1,7 @@
 # https://github.com/123panNextGen/123pan
 # src/ui_widgets.py
 
-from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtWidgets
 import os
 from config import ConfigManager
 
@@ -176,3 +176,62 @@ class LoginDialog(QtWidgets.QDialog):
     def get_pan(self):
         """获取登录成功的Pan对象"""
         return self.pan
+
+
+class AboutDialog(QtWidgets.QDialog):
+    """关于对话框"""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("关于123pan")
+        self.setModal(True)
+        self.resize(450, 350)
+        self.setWindowFlags(self.windowFlags() & ~QtCore.Qt.WindowType.WindowContextHelpButtonHint)
+        
+        layout = QtWidgets.QVBoxLayout(self)
+        
+        # 应用标题
+        title = QtWidgets.QLabel("123pan")
+        title_font = title.font()
+        title_font.setPointSize(24)
+        title_font.setBold(True)
+        title.setFont(title_font)
+        title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(title)
+        
+        # 分隔线
+        separator1 = QtWidgets.QFrame()
+        separator1.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        layout.addWidget(separator1)
+        
+        # 版本信息
+        version_label = QtWidgets.QLabel("版本: 2.4.0")
+        version_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(version_label)
+        
+        # 描述
+        description = QtWidgets.QLabel("123pan是一款基于Python开发的高效下载辅助工具，通过模拟安卓客户端协议，帮助用户绕过123云盘的自用下载流量限制，实现无阻碍下载体验。")
+        description.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        description.setWordWrap(True)
+        layout.addWidget(description)
+        
+        
+        # 分隔线
+        separator3 = QtWidgets.QFrame()
+        separator3.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        layout.addWidget(separator3)
+        
+        # 项目信息
+        project_info = QtWidgets.QLabel(
+            "GitHub: https://github.com/123panNextGen/123pan\n"
+            "By Qxyz17 xhdndmm \n"
+            "Apache License v2.0"
+        )
+        project_info.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        project_info.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        layout.addWidget(project_info)
+        
+        # 关闭按钮
+        btn_close = QtWidgets.QPushButton("关闭")
+        btn_close.clicked.connect(self.accept)
+        layout.addWidget(btn_close)

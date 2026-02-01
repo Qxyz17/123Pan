@@ -1,4 +1,6 @@
-"""多线程任务模块"""
+# https://github.com/123panNextGen/123pan
+# src/threading_utils.py
+
 from PyQt6 import QtCore
 
 
