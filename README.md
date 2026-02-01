@@ -11,14 +11,14 @@
     <a href="https://www.python.org/"><img src="https://img.shields.io/badge/python-3.8%2B-blue?style=for-the-badge&logo=python" alt="Python Version"></a>
     <a href="https://github.com/Qxyz17/123pan/releases"><img src="https://img.shields.io/github/downloads/Qxyz17/123pan/total?style=for-the-badge&color=orange" alt="Downloads"></a>
   </div>
-  
+  <br>
+  <img src="./doc/img/image.png" width="600"><img>
+
 </div>
 
 ---
 
 ## 📖 项目介绍
-
-[项目地址](https://github.com/Qxyz17/123pan)
 
 123pan是一款基于Python开发的高效下载辅助工具，通过模拟安卓客户端协议，帮助用户绕过123云盘的自用下载流量限制，实现无阻碍下载体验。
 
