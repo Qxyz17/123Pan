@@ -21,6 +21,9 @@ def get_logger(name: str = "123pan"):
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
         )
 
+        if not os.path.exists(CONFIG_DIR):
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+            
         file_handler = logging.FileHandler(LOG_FILE, encoding='utf-8')
         file_handler.setFormatter(formatter)
 
