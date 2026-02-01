@@ -73,9 +73,10 @@ jobs:
         with:
           path: artifacts
 
-      - name: Publish Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/123pan-windows/*
-            artifacts/123pan-linux/*
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          files: all_binaries/*
+          generate_release_notes: true
