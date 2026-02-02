@@ -40,6 +40,21 @@ QTableWidget::item {
     color: #4c4f69;
 }
 
+QPushButton#transferActionBtn {
+    background-color: #89b4fa;
+    color: white;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+QPushButton#transferActionBtn:hover {
+    background-color: #b4befe;
+}
+
+QPushButton#transferActionBtn:pressed {
+    background-color: #74c7ec;
+}
+
 /* 表格行悬停效果 */
 QTableWidget::item:hover {
     background-color: #dfe0ea;
@@ -302,6 +317,21 @@ QTableWidget::item {
     background-color: transparent;
     border-radius: 6px;
     color: #cdd6f4;
+}
+
+QPushButton#transferActionBtn {
+    background-color: #89b4fa;
+    color: white;
+    border-radius: 4px;
+    font-size: 11px;
+}
+
+QPushButton#transferActionBtn:hover {
+    background-color: #b4befe;
+}
+
+QPushButton#transferActionBtn:pressed {
+    background-color: #74c7ec;
 }
 
 /* 表格行悬停效果 */

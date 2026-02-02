@@ -1,5 +1,5 @@
 # https://github.com/123panNextGen/123pan
-# src/main.window.py
+# src/main_window.py
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 import os
@@ -699,10 +699,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.table.setRowCount(0)
         
-        # 逐行添加，使用定时器实现动画效果
-        for i, item in enumerate(self.pan.list):
-            # 使用定时器延迟添加，实现逐行出现的效果
-            QtCore.QTimer.singleShot(i * 30, lambda idx=i: self._add_row(idx))
+        # 直接添加所有行，避免延迟导致的数据错乱
+        for index, item in enumerate(self.pan.list):
+            self._add_row(index)
 
         names = getattr(self.pan, "parent_file_name_list", [])
         path = "/" + "/".join(names) if names else "/"
@@ -1164,96 +1163,107 @@ class MainWindow(QtWidgets.QMainWindow):
                     "padding: 8px;"
                     "line-height: 1.4;"
                 )
+
     
-    def add_transfer_task(self, task_type, file_name, file_size):
-        """添加传输任务到列表和表格"""
-        task_id = self.next_task_id
-        self.next_task_id += 1
-        
-        # 创建任务对象
-        task = {
-            "id": task_id,
-            "type": task_type,  # "下载" 或 "上传"
-            "file_name": file_name,
-            "file_size": file_size,
-            "progress": 0,
-            "status": "等待中",
-            "file_path": "",  # 用于保存下载文件路径，便于取消时删除
-            "threaded_task": None  # 保存线程任务引用
-        }
-        
-        # 添加到任务列表
-        self.transfer_tasks.append(task)
-        
-        # 添加到表格
-        row = self.transfer_table.rowCount()
-        self.transfer_table.insertRow(row)
-        
-        # 设置表格内容
-        self.transfer_table.setItem(row, 0, QtWidgets.QTableWidgetItem(task_type))
-        self.transfer_table.setItem(row, 1, QtWidgets.QTableWidgetItem(file_name))
-        self.transfer_table.setItem(row, 2, QtWidgets.QTableWidgetItem(self.format_file_size(file_size)))
-        self.transfer_table.setItem(row, 3, QtWidgets.QTableWidgetItem("0%"))
-        self.transfer_table.setItem(row, 4, QtWidgets.QTableWidgetItem("等待中"))
-        
-        # 添加取消按钮
-        cancel_btn = QtWidgets.QPushButton("⏹️")
-        cancel_btn.setToolTip("停止传输")
-        cancel_btn.setStyleSheet(
-            "background-color: rgba(239, 68, 68, 0.08);"
-            "color: #EF4444;"
-            "border: 1px solid rgba(239, 68, 68, 0.2);"
-            "border-radius: 6px;"
-            "padding: 4px 8px;"
-            "font-size: 14px;"
-            "min-width: 30px;"
-            "max-width: 30px;"
-        )
-        cancel_btn.clicked.connect(lambda _, tid=task_id: self.cancel_transfer_task(tid))
+    def add_transfer_task(self, type_str, name, size):
+            # 确保 UI 操作在主线程
+            row = self.transfer_table.rowCount()
+            self.transfer_table.insertRow(row)
 
-        # 添加暂停/继续按钮
-        pause_btn = QtWidgets.QPushButton("⏸️")
-        pause_btn.setToolTip("暂停传输")
-        pause_btn.setStyleSheet(
-            "background-color: rgba(59, 130, 246, 0.08);"
-            "color: #2563EB;"
-            "border: 1px solid rgba(37, 99, 235, 0.2);"
-            "border-radius: 6px;"
-            "padding: 4px 8px;"
-            "font-size: 14px;"
-            "min-width: 30px;"
-            "max-width: 30px;"
-        )
-        pause_btn.clicked.connect(lambda _, tid=task_id: self.pause_transfer_task(tid))
+            task_id = self.next_task_id
+            self.next_task_id += 1
 
-        # 将两个按钮放在一个容器里
-        btn_container = QtWidgets.QWidget()
-        btn_layout = QtWidgets.QHBoxLayout(btn_container)
-        btn_layout.setContentsMargins(0, 0, 0, 0)
-        btn_layout.setSpacing(4)
-        btn_layout.addWidget(pause_btn)
-        btn_layout.addWidget(cancel_btn)
-        self.transfer_table.setCellWidget(row, 5, btn_container)
+            # 把 task_id 绑定到 Item 上
+            name_item = QtWidgets.QTableWidgetItem(name)
+            name_item.setData(QtCore.Qt.ItemDataRole.UserRole, task_id)
 
-        # 保存按钮引用，便于后续隐藏或修改
-        task['cancel_button'] = cancel_btn
-        task['pause_button'] = pause_btn
+            self.transfer_table.setItem(row, 0, QtWidgets.QTableWidgetItem(type_str))
+            self.transfer_table.setItem(row, 1, name_item)
+
+            # 格式化大小
+            s = f"{round(size / 1048576, 2)} MB" if size > 1048576 else f"{round(size / 1024, 2)} KB"
+            self.transfer_table.setItem(row, 2, QtWidgets.QTableWidgetItem(s))
+            self.transfer_table.setItem(row, 3, QtWidgets.QTableWidgetItem("0%"))
+            self.transfer_table.setItem(row, 4, QtWidgets.QTableWidgetItem("等待中"))
+            
+            # 创建并初始化任务字典，添加到transfer_tasks列表中
+            task = {
+                "id": task_id,
+                "type": type_str,
+                "name": name,
+                "size": size,
+                "progress": 0,
+                "status": "等待中",
+                "file_path": None,
+                "threaded_task": None,
+                "pause_button": None,
+                "cancel_button": None,
+                "row": row
+            }
+            self.transfer_tasks.append(task)
+
+            # 添加操作按钮
+            action_widget = self.create_action_buttons(task_id)
+            self.transfer_table.setCellWidget(row, 5, action_widget)
+
+            return task_id
+
+    def create_action_buttons(self, task_id):
+        container = QtWidgets.QWidget()
+        layout = QtWidgets.QHBoxLayout(container)
         
-        return task_id
+        # 暂停/恢复按钮
+        pause_btn = QtWidgets.QPushButton("暂停")
+        # 取消按钮
+        cancel_btn = QtWidgets.QPushButton("取消")
+        
+        # 设置按钮固定大小，防止被 QSS 拉伸变形
+        pause_btn.setFixedSize(60, 24)
+        cancel_btn.setFixedSize(60, 24)
+        
+        # 可以在这里为这些按钮添加特定的对象名，以便单独设置样式
+        pause_btn.setObjectName("transferActionBtn")
+        cancel_btn.setObjectName("transferActionBtn")
+        
+        # 连接按钮信号到处理函数
+        pause_btn.clicked.connect(lambda: self.toggle_task_pause(task_id, pause_btn))
+        cancel_btn.clicked.connect(lambda: self.cancel_task(task_id))
+        
+        # 保存按钮引用到任务中，便于后续更新
+        for i, t in enumerate(self.transfer_tasks):
+            if t["id"] == task_id:
+                self.transfer_tasks[i]['pause_button'] = pause_btn
+                self.transfer_tasks[i]['cancel_button'] = cancel_btn
+                break
+
+        layout.addWidget(pause_btn)
+        layout.addWidget(cancel_btn)
+        layout.setContentsMargins(5, 2, 5, 2)
+        layout.setSpacing(10)
+        layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        
+        return container
     
     def update_transfer_task(self, task_id, progress, status):
-        """更新传输任务的进度和状态"""
-        # 查找任务
-        for i, task in enumerate(self.transfer_tasks):
-            if task["id"] == task_id:
-                # 更新任务对象
-                task["progress"] = progress
-                task["status"] = status
+            """根据 task_id 安全地更新传输列表中的某一行"""
+            # 遍历表格找到匹配 task_id 的行（假设我们将 task_id 存储在某列的数据角色中）
+            found_row = -1
+            for row in range(self.transfer_table.rowCount()):
+                item = self.transfer_table.item(row, 1) # 获取文件名那一列
+                if item and item.data(QtCore.Qt.ItemDataRole.UserRole) == task_id:
+                    found_row = row
+                    break
+            
+            if found_row == -1:
+                return
+
+            # 更新进度 (第3列)
+            if progress is not None:
+                self.transfer_table.item(found_row, 3).setText(f"{progress}%")
                 
-                # 更新表格
-                self.transfer_table.setItem(i, 3, QtWidgets.QTableWidgetItem(f"{progress}%"))
-                self.transfer_table.setItem(i, 4, QtWidgets.QTableWidgetItem(status))
-                break
+            # 更新状态 (第4列)
+            if status:
+                self.transfer_table.item(found_row, 4).setText(status)
     
     def cancel_transfer_task(self, task_id):
         """取消传输任务"""
@@ -1628,8 +1638,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return f"获取链接失败: {str(e)}"
 
     def _after_get_link(self, url):
-        if isinstance(url, int):
-            self._show_error("获取链接失败，返回码: " + str(url))
+        if isinstance(url, int) or (isinstance(url, str) and url.startswith("获取链接失败")):
+            error_msg = str(url) if isinstance(url, str) else ("获取链接失败，返回码: " + str(url))
+            self._show_error(error_msg)
             return
         dlg = QtWidgets.QDialog(self)
         dlg.setWindowTitle("下载链接")
@@ -1941,6 +1952,41 @@ class MainWindow(QtWidgets.QMainWindow):
             pass
         event.accept()
 
+    def on_pause_clicked(self, task):
+        if task.is_paused:
+            task.resume()
+        else:
+            task.pause()
+
+    def on_cancel_clicked(self, task_id):
+        if task_id in self.active_tasks:
+            self.active_tasks[task_id].cancel()
+
+    def toggle_task_pause(self, task_id, button):
+        """处理暂停和恢复逻辑"""
+        task = self.active_tasks.get(task_id)
+        if not task: return
+        
+        if task.is_paused:
+            task.resume()
+            button.setText("暂停")
+            button.setStyleSheet(button.styleSheet().replace("#f9e2af", self.get_theme_color('accent')))
+        else:
+            task.pause()
+            button.setText("恢复")
+            # 变成警告色（黄色）
+            button.setStyleSheet(button.styleSheet().replace(self.get_theme_color('accent'), "#f9e2af"))
+            self.update_transfer_task(task_id, None, "已暂停")
+
+    def cancel_task(self, task_id):
+        """取消任务"""
+        task = self.active_tasks.get(task_id)
+        if task:
+            task.cancel()
+            self.update_transfer_task(task_id, 0, "已取消")
+            if task_id in self.active_tasks:
+                del self.active_tasks[task_id]
+
 def main():
     app = QtWidgets.QApplication(sys.argv)
     w = MainWindow()
@@ -1949,4 +1995,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
