@@ -15,6 +15,7 @@ from config import ConfigManager
 from ui_widgets import SidebarButton, LoginDialog, SettingsDialog, AboutDialog
 from api import Pan123
 from threading_utils import ThreadedTask
+from ui_theme_manager import ThemeManager
 
 logger = get_logger(__name__)
 
@@ -120,7 +121,41 @@ class MainWindow(QtWidgets.QMainWindow):
         self.threadpool.setMaxThreadCount(64)
 
         # 应用123云盘主题
-        self.apply_blue_white_theme()
+        self.theme_manager = ThemeManager(self)
+        
+        # 注册主题改变回调
+        self.theme_manager.on_theme_changed = self.on_theme_changed
+        
+        # 主题颜色映射
+        self.theme_colors = {
+            'light': {
+                'text_primary': '#2d3749',
+                'text_secondary': '#4c4f69',
+                'text_disabled': '#9ca0b0',
+                'bg_primary': '#eff1f5',
+                'bg_secondary': '#fafbfc',
+                'accent': '#1e66f5',
+                'success': '#40a02b',
+                'warning': '#df8e1d',
+                'error': '#d20f39',
+            },
+            'dark': {
+                'text_primary': '#cdd6f4',
+                'text_secondary': '#bac2de',
+                'text_disabled': '#6c7086',
+                'bg_primary': '#1e1e2e',
+                'bg_secondary': '#313244',
+                'accent': '#89b4fa',
+                'success': '#a6e3a1',
+                'warning': '#f9e2af',
+                'error': '#f38ba8',
+            }
+        }
+        
+        # 监听系统主题变化
+        self.theme_timer = QtCore.QTimer()
+        self.theme_timer.timeout.connect(self.theme_manager.check_theme_change)
+        self.theme_timer.start(5000)  # 每5秒检查一次
 
         # 中央布局
         central = QtWidgets.QWidget()
@@ -133,9 +168,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sidebar = QtWidgets.QWidget()
         self.sidebar.setMinimumWidth(200)
         self.sidebar.setMaximumWidth(200)
+        
+        # 动态设置侧边栏样式
+        sidebar_bg = "#fafbfc" if not self.theme_manager.is_dark_mode else "#181825"
+        sidebar_border = "#acb0be" if not self.theme_manager.is_dark_mode else "#313244"
         self.sidebar.setStyleSheet(
-            "background-color: rgba(255, 255, 255, 0.95);"
-            "border-right: 1px solid rgba(0, 0, 0, 0.05);"
+            f"background-color: {sidebar_bg};"
+            f"border-right: 1px solid {sidebar_border};"
             "border-radius: 0;"
         )
         sidebar_layout = QtWidgets.QVBoxLayout(self.sidebar)
@@ -144,13 +183,14 @@ class MainWindow(QtWidgets.QMainWindow):
         sidebar_layout.setAlignment(QtCore.Qt.AlignmentFlag.AlignTop)
         
         # 侧边栏标题
-        sidebar_title = QtWidgets.QLabel("功能菜单")
-        sidebar_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        sidebar_title.setStyleSheet(
-            "font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 16px;"
+        self.sidebar_title = QtWidgets.QLabel("功能菜单")
+        self.sidebar_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        title_color = "#2d3749" if not self.theme_manager.is_dark_mode else "#cdd6f4"
+        self.sidebar_title.setStyleSheet(
+            f"font-size: 18px; font-weight: bold; color: {title_color}; margin-bottom: 16px; "
             "padding: 8px 0;"
         )
-        sidebar_layout.addWidget(sidebar_title)
+        sidebar_layout.addWidget(self.sidebar_title)
         
         # 侧边栏按钮组
         self.sidebar_buttons = []
@@ -163,14 +203,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_files.setMinimumWidth(140)
         self.btn_files.setMaximumHeight(100)
         self.btn_files.setMaximumWidth(140)
-        self.btn_files.setStyleSheet(
-            "font-size: 13px; text-align: center; font-weight: 500;"
-            "background-color: rgba(59, 130, 246, 0.9);"
-            "color: white; border-radius: 16px;"
-            "border: none;"
-            "padding: 8px;"
-            "line-height: 1.4;"
-        )
+        self.btn_files.setStyleSheet(self.get_sidebar_button_style(is_active=True))
         sidebar_layout.addWidget(self.btn_files, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.sidebar_buttons.append(self.btn_files)
         
@@ -180,14 +213,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.btn_transfer.setMinimumWidth(140)
         self.btn_transfer.setMaximumHeight(100)
         self.btn_transfer.setMaximumWidth(140)
-        self.btn_transfer.setStyleSheet(
-            "font-size: 13px; text-align: center; font-weight: 500;"
-            "background-color: rgba(229, 231, 235, 0.8); color: #334155;"
-            "border-radius: 16px;"
-            "border: 1px solid rgba(0, 0, 0, 0.08);"
-            "padding: 8px;"
-            "line-height: 1.4;"
-        )
+        self.btn_transfer.setStyleSheet(self.get_sidebar_button_style(is_active=False))
         sidebar_layout.addWidget(self.btn_transfer, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.sidebar_buttons.append(self.btn_transfer)
         
@@ -279,9 +305,40 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 为每个按钮添加动画效果
         self.button_animations = {}
+        # 记录按钮原始尺寸，避免动画使用未完成布局的宽度作为基准
+        if not hasattr(self, 'button_original_sizes'):
+            self.button_original_sizes = {}
+
         for b in btns:
             b.setMinimumHeight(30)
-            b.setMinimumWidth(110)
+            # 根据按钮文本自动计算最小宽度，保证中文/emoji不被截断
+            fm = b.fontMetrics()
+            text_width = fm.horizontalAdvance(b.text())
+            padding = 32  # 左右内边距预留（4px padding + 8px border margin）
+            calc_min_w = max(85, text_width + padding)
+            b.setMinimumWidth(calc_min_w)
+            # 设置较大的最大宽度，避免动画过程中被意外限制
+            b.setMaximumWidth(max(calc_min_w + 20, 2000))
+            # 初始记录为计算得到的最小宽度
+            self.button_original_sizes[b] = calc_min_w
+            b.setSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Minimum)
+            b.setStyleSheet(
+                "QPushButton {"
+                "  padding: 4px 8px;"
+                "  background-color: rgba(229, 231, 235, 0.8);"
+                "  color: #334155;"
+                "  border: 1px solid rgba(0, 0, 0, 0.08);"
+                "  border-radius: 6px;"
+                "  font-size: 12px;"
+                "  font-weight: 500;"
+                "}"
+                "QPushButton:hover {"
+                "  background-color: rgba(209, 213, 219, 0.9);"
+                "}"
+                "QPushButton:pressed {"
+                "  background-color: rgba(189, 195, 204, 1.0);"
+                "}"
+            )
             toolbar_h.addWidget(b)
             
             # 为按钮添加悬停和点击事件，实现动画效果
@@ -289,11 +346,6 @@ class MainWindow(QtWidgets.QMainWindow):
             b.leaveEvent = lambda event, btn=b: self.on_button_leave(btn)
             b.pressed.connect(lambda btn=b: self.on_button_pressed(btn))
             b.released.connect(lambda btn=b: self.on_button_released(btn))
-            
-            # 初始化按钮动画
-            animation = QtCore.QPropertyAnimation(b, b"geometry")
-            animation.setDuration(100)
-            self.button_animations[b] = animation
 
         toolbar_h.addStretch()
         right_layout.addLayout(toolbar_h)
@@ -359,7 +411,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.spinner_timer = QtCore.QTimer()
         self.spinner_angle = 0
         self.spinner_timer.timeout.connect(self.update_spinner)
-        self.spinner_timer.start(50)  # 每50毫秒更新一次
+        # 不在这里启动计时器，延迟到loading_widget显示时再启动
         
         loading_layout.addWidget(self.loading_spinner)
         
@@ -382,7 +434,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # 传输页面内容
         transfer_title = QtWidgets.QLabel("传输任务")
         transfer_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        transfer_title.setStyleSheet("font-size: 24px; font-weight: bold; color: #334155; margin: 20px 0;")
+        title_color = self.get_theme_color('text_primary')
+        transfer_title.setStyleSheet(f"font-size: 24px; font-weight: bold; color: {title_color}; margin: 20px 0;")
         transfer_layout.addWidget(transfer_title)
         
         self.transfer_table = QtWidgets.QTableWidget(0, 6)
@@ -436,234 +489,6 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # 启动登录流程
         self.startup_login_flow()
-    def apply_blue_white_theme(self):
-        """
-        123云盘主题样式表 - iOS 26 Liquid Glass 液态毛玻璃效果
-        """
-        style = """
-        /* 全局样式 */
-        QWidget {
-            background-color: rgba(255, 255, 255, 0.8);
-            color: #1E293B;
-            font-family: "SF Pro Display", "Segoe UI", "Microsoft YaHei", "PingFang SC", "Helvetica Neue", Arial;
-            font-size: 13px;
-        }
-        
-        /* 主窗口 */
-        QMainWindow {
-            background-color: rgba(245, 245, 247, 0.95);
-        }
-        
-        /* 表格样式 - 液态毛玻璃效果（模拟） */
-        QTableWidget {
-            background-color: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.8);
-            border-radius: 12px;
-            padding: 8px;
-            gridline-color: rgba(0, 0, 0, 0.05);
-        }
-        
-        /* 表格行样式 */
-        QTableWidget::item {
-            padding: 10px 6px;
-            border: none;
-            background-color: transparent;
-            border-radius: 6px;
-        }
-        
-        /* 表格行悬停效果 */
-        QTableWidget::item:hover {
-            background-color: rgba(59, 130, 246, 0.1);
-        }
-        
-        /* 表格行选中效果 */
-        QTableWidget::item:selected {
-            background-color: rgba(59, 130, 246, 0.9);
-            color: #FFFFFF;
-        }
-        
-        /* 表头样式 */
-        QHeaderView::section {
-            background-color: rgba(255, 255, 255, 0.95);
-            color: #334155;
-            padding: 12px 16px;
-            border: none;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-            font-weight: 600;
-            text-align: left;
-            border-radius: 8px 8px 0 0;
-        }
-        
-        QHeaderView {
-            background-color: transparent;
-            border: none;
-        }
-        
-        /* 按钮样式 - 液态毛玻璃效果（模拟） */
-        QPushButton {
-            background-color: rgba(255, 255, 255, 0.95);
-            color: #3B82F6;
-            border: 1px solid rgba(59, 130, 246, 0.4);
-            border-radius: 12px;
-            padding: 10px 18px;
-            font-weight: 500;
-            font-size: 14px;
-        }
-        
-        QPushButton:hover {
-            background-color: rgba(255, 255, 255, 0.98);
-            border-color: rgba(59, 130, 246, 0.6);
-        }
-        
-        QPushButton:pressed {
-            background-color: rgba(230, 240, 255, 0.95);
-            border-color: rgba(59, 130, 246, 0.8);
-        }
-        
-        QPushButton:disabled {
-            background-color: rgba(240, 240, 245, 0.8);
-            border-color: rgba(148, 163, 184, 0.4);
-            color: rgba(148, 163, 184, 0.8);
-        }
-        
-        /* 输入控件样式 - 液态毛玻璃效果（模拟） */
-        QLineEdit, QTextEdit, QComboBox {
-            background-color: rgba(255, 255, 255, 0.95);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            padding: 10px 14px;
-            border-radius: 12px;
-        }
-        
-        QLineEdit:focus, QTextEdit:focus, QComboBox:focus {
-            border-color: rgba(59, 130, 246, 0.6);
-        }
-        
-        /* 状态栏样式 - 液态毛玻璃效果（模拟） */
-        QStatusBar {
-            background-color: rgba(255, 255, 255, 0.95);
-            color: #334155;
-            padding: 8px 16px;
-            border-top: 1px solid rgba(0, 0, 0, 0.05);
-        }
-        
-        /* 菜单样式 - 液态毛玻璃效果（模拟） */
-        QMenu {
-            background-color: rgba(255, 255, 255, 0.98);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 12px;
-            padding: 8px 0;
-        }
-        
-        QMenu::item {
-            padding: 10px 24px;
-            background-color: transparent;
-            border: none;
-            border-radius: 8px;
-            margin: 2px 8px;
-        }
-        
-        QMenu::item:selected {
-            background-color: rgba(59, 130, 246, 0.15);
-            color: #3B82F6;
-        }
-        
-        /* 滚动条样式 - 液态毛玻璃效果（模拟） */
-        QScrollBar {
-            background-color: rgba(255, 255, 255, 0.7);
-            border-radius: 10px;
-            width: 10px;
-            height: 10px;
-        }
-        
-        QScrollBar::handle {
-            background-color: rgba(59, 130, 246, 0.6);
-            border-radius: 10px;
-            min-width: 24px;
-            min-height: 24px;
-        }
-        
-        QScrollBar::handle:hover {
-            background-color: rgba(59, 130, 246, 0.8);
-        }
-        
-        QScrollBar::add-line, QScrollBar::sub-line {
-            background-color: transparent;
-        }
-        
-        /* 对话框样式 - 液态毛玻璃效果（模拟） */
-        QDialog {
-            background-color: rgba(255, 255, 255, 0.98);
-            border: 1px solid rgba(255, 255, 255, 0.9);
-            border-radius: 16px;
-        }
-        
-        /* 分组框样式 - 液态毛玻璃效果（模拟） */
-        QGroupBox {
-            background-color: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(0, 0, 0, 0.08);
-            border-radius: 12px;
-            margin-top: 16px;
-            padding: 16px;
-        }
-        
-        QGroupBox::title {
-            color: #334155;
-            font-weight: 600;
-            subcontrol-origin: margin;
-            subcontrol-position: top left;
-            padding: 0 12px;
-        }
-        
-        /* 复选框样式 - 液态毛玻璃效果（模拟） */
-        QCheckBox {
-            spacing: 8px;
-        }
-        
-        QCheckBox::indicator {
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(59, 130, 246, 0.6);
-            border-radius: 6px;
-            background-color: rgba(255, 255, 255, 0.95);
-        }
-        
-        QCheckBox::indicator:checked {
-            background-color: rgba(59, 130, 246, 0.95);
-            border-color: rgba(59, 130, 246, 0.95);
-        }
-        
-        /* 标签样式 */
-        QLabel {
-            color: #334155;
-        }
-        
-        /* 路径标签 */
-        QLabel#lbl_path {
-            font-weight: 600;
-            color: #3B82F6;
-            font-size: 14px;
-        }
-        
-        /* 加载动画标签 */
-        QLabel#loading_label {
-            color: #3B82F6;
-        }
-        
-        /* 设置按钮特殊样式 */
-        QPushButton#btn_settings {
-            background-color: transparent;
-            border: none;
-            border-radius: 8px;
-            font-size: 18px;
-            padding: 6px;
-            color: #3B82F6;
-        }
-        
-        QPushButton#btn_settings:hover {
-            background-color: rgba(59, 130, 246, 0.1);
-        }
-        """
-        self.setStyleSheet(style)
 
     def on_settings(self):
         """打开设置对话框"""
@@ -957,6 +782,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # 显示加载动画
         self.table.setVisible(False)
         self.loading_widget.setVisible(True)
+        # 启动加载动画计时器
+        if not self.spinner_timer.isActive():
+            self.spinner_timer.start(50)
         self.status.showMessage("正在获取目录...")
         
         task = ThreadedTask(self._task_get_dir)
@@ -972,6 +800,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # 隐藏加载动画，显示表格
         self.loading_widget.setVisible(False)
         self.table.setVisible(True)
+        # 停止加载动画计时器
+        if self.spinner_timer.isActive():
+            self.spinner_timer.stop()
         
         if code != 0:
             self.status.showMessage(f"获取目录返回码: {code}", 5000)
@@ -1015,116 +846,98 @@ class MainWindow(QtWidgets.QMainWindow):
             self._show_error("进入文件夹失败: " + str(e))
     
     def on_button_hover(self, button):
-        """按钮悬停效果 - 修复动画冲突"""
-        # 停止当前正在运行的动画
-        if button in self.button_animations:
-            self.button_animations[button].stop()
-        
-        # 保存原始位置，用于恢复
-        if not hasattr(self, 'button_original_geoms'):
-            self.button_original_geoms = {}
-        if button not in self.button_original_geoms:
-            self.button_original_geoms[button] = button.geometry()
-        
-        # 创建放大动画
-        scale_animation = QtCore.QPropertyAnimation(button, b"geometry")
-        current_geom = button.geometry()
-        original_geom = self.button_original_geoms[button]
-        # 基于原始位置计算新位置，避免累积误差
-        new_geom = QtCore.QRect(
-            original_geom.x() - 2,
-            original_geom.y() - 2,
-            original_geom.width() + 4,
-            original_geom.height() + 4
+        """按钮悬停效果 - 改变背景色和边框"""
+        button.setStyleSheet(
+            "QPushButton {"
+            "  padding: 4px 8px;"
+            "  background-color: rgba(189, 195, 204, 0.95);"
+            "  color: #334155;"
+            "  border: 1px solid rgba(59, 130, 246, 0.3);"
+            "  border-radius: 6px;"
+            "  font-size: 12px;"
+            "  font-weight: 500;"
+            "}"
         )
-        scale_animation.setStartValue(current_geom)
-        scale_animation.setEndValue(new_geom)
-        scale_animation.setDuration(150)
-        scale_animation.setEasingCurve(QtCore.QEasingCurve.Type.OutQuad)
-        scale_animation.start()
-        
-        # 保存动画引用
-        self.button_animations[button] = scale_animation
     
     def on_button_leave(self, button):
-        """按钮离开效果 - 修复动画冲突"""
+        """按钮离开效果 - 恢复原始样式"""
         # 停止当前正在运行的动画
         if button in self.button_animations:
             self.button_animations[button].stop()
-        
-        # 恢复到原始位置
-        if hasattr(self, 'button_original_geoms') and button in self.button_original_geoms:
-            # 创建恢复动画
-            scale_animation = QtCore.QPropertyAnimation(button, b"geometry")
-            current_geom = button.geometry()
-            original_geom = self.button_original_geoms[button]
-            scale_animation.setStartValue(current_geom)
-            scale_animation.setEndValue(original_geom)
-            scale_animation.setDuration(150)
-            scale_animation.setEasingCurve(QtCore.QEasingCurve.Type.OutQuad)
-            scale_animation.start()
-            
-            # 保存动画引用
-            self.button_animations[button] = scale_animation
+
+        button.setStyleSheet(
+            "QPushButton {"
+            "  padding: 4px 8px;"
+            "  background-color: rgba(229, 231, 235, 0.8);"
+            "  color: #334155;"
+            "  border: 1px solid rgba(0, 0, 0, 0.08);"
+            "  border-radius: 6px;"
+            "  font-size: 12px;"
+            "  font-weight: 500;"
+            "}"
+            "QPushButton:hover {"
+            "  background-color: rgba(209, 213, 219, 0.9);"
+            "}"
+            "QPushButton:pressed {"
+            "  background-color: rgba(189, 195, 204, 1.0);"
+            "}"
+        )
     
     def on_button_pressed(self, button):
-        """按钮按下效果 - 修复动画冲突"""
+        """按钮按下效果 - 改变样式"""
         # 停止当前正在运行的动画
         if button in self.button_animations:
             self.button_animations[button].stop()
-        
-        # 创建按下动画
-        scale_animation = QtCore.QPropertyAnimation(button, b"geometry")
-        current_geom = button.geometry()
-        # 基于当前位置轻微缩小
-        new_geom = QtCore.QRect(
-            current_geom.x() + 1,
-            current_geom.y() + 1,
-            current_geom.width() - 2,
-            current_geom.height() - 2
+
+        button.setStyleSheet(
+            "QPushButton {"
+            "  padding: 4px 8px;"
+            "  background-color: rgba(169, 177, 189, 1.0);"
+            "  color: #334155;"
+            "  border: 1px solid rgba(59, 130, 246, 0.4);"
+            "  border-radius: 6px;"
+            "  font-size: 12px;"
+            "  font-weight: 500;"
+            "}"
         )
-        scale_animation.setStartValue(current_geom)
-        scale_animation.setEndValue(new_geom)
-        scale_animation.setDuration(100)
-        scale_animation.setEasingCurve(QtCore.QEasingCurve.Type.InQuad)
-        scale_animation.start()
-        
-        # 保存动画引用
-        self.button_animations[button] = scale_animation
     
     def on_button_released(self, button):
-        """按钮释放效果 - 修复动画冲突"""
+        """按钮释放效果 - 恢复样式"""
         # 停止当前正在运行的动画
         if button in self.button_animations:
             self.button_animations[button].stop()
-        
-        # 恢复到原始放大状态（如果是悬停中）或原始状态
-        scale_animation = QtCore.QPropertyAnimation(button, b"geometry")
-        current_geom = button.geometry()
-        
-        if hasattr(self, 'button_original_geoms') and button in self.button_original_geoms:
-            # 检查鼠标是否仍然在按钮上
-            if button.underMouse():
-                # 恢复到悬停放大状态
-                original_geom = self.button_original_geoms[button]
-                new_geom = QtCore.QRect(
-                    original_geom.x() - 2,
-                    original_geom.y() - 2,
-                    original_geom.width() + 4,
-                    original_geom.height() + 4
-                )
-            else:
-                # 恢复到原始状态
-                new_geom = self.button_original_geoms[button]
-            
-            scale_animation.setStartValue(current_geom)
-            scale_animation.setEndValue(new_geom)
-            scale_animation.setDuration(100)
-            scale_animation.setEasingCurve(QtCore.QEasingCurve.Type.OutQuad)
-            scale_animation.start()
-            
-            # 保存动画引用
-            self.button_animations[button] = scale_animation
+
+        # 检查鼠标是否仍在按钮上
+        if button.underMouse():
+            button.setStyleSheet(
+                "QPushButton {"
+                "  padding: 4px 8px;"
+                "  background-color: rgba(189, 195, 204, 0.95);"
+                "  color: #334155;"
+                "  border: 1px solid rgba(59, 130, 246, 0.3);"
+                "  border-radius: 6px;"
+                "  font-size: 12px;"
+                "  font-weight: 500;"
+                "}"
+            )
+        else:
+            button.setStyleSheet(
+                "QPushButton {"
+                "  padding: 4px 8px;"
+                "  background-color: rgba(229, 231, 235, 0.8);"
+                "  color: #334155;"
+                "  border: 1px solid rgba(0, 0, 0, 0.08);"
+                "  border-radius: 6px;"
+                "  font-size: 12px;"
+                "  font-weight: 500;"
+                "}"
+                "QPushButton:hover {"
+                "  background-color: rgba(209, 213, 219, 0.9);"
+                "}"
+                "QPushButton:pressed {"
+                "  background-color: rgba(189, 195, 204, 1.0);"
+                "}"
+            )
 
     def on_table_context_menu(self, pos):
         row = self.table.indexAt(pos).row()
@@ -1229,7 +1042,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_mkdir.setVisible(False)
     
     def on_sidebar_button_hover(self, button):
-        """侧边栏按钮悬停效果 - 改变背景色并增加阴影"""
+        """侧边栏按钮悬停效果 - 改变背景色"""
         if button == self.btn_files:
             button.setStyleSheet(
                 "font-size: 13px; text-align: center; font-weight: 500;"
@@ -1238,7 +1051,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 "border: none;"
                 "padding: 8px;"
                 "line-height: 1.4;"
-                "box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);"
             )
         elif button == self.btn_transfer:
             button.setStyleSheet(
@@ -1385,26 +1197,32 @@ class MainWindow(QtWidgets.QMainWindow):
         self.transfer_table.setItem(row, 4, QtWidgets.QTableWidgetItem("等待中"))
         
         # 添加取消按钮
-        cancel_btn = QtWidgets.QPushButton("取消")
+        cancel_btn = QtWidgets.QPushButton("⏹️")
+        cancel_btn.setToolTip("停止传输")
         cancel_btn.setStyleSheet(
-            "background-color: rgba(239, 68, 68, 0.1);"
+            "background-color: rgba(239, 68, 68, 0.08);"
             "color: #EF4444;"
-            "border: 1px solid rgba(239, 68, 68, 0.3);"
-            "border-radius: 8px;"
-            "padding: 4px 12px;"
-            "font-size: 12px;"
+            "border: 1px solid rgba(239, 68, 68, 0.2);"
+            "border-radius: 6px;"
+            "padding: 4px 8px;"
+            "font-size: 14px;"
+            "min-width: 30px;"
+            "max-width: 30px;"
         )
         cancel_btn.clicked.connect(lambda _, tid=task_id: self.cancel_transfer_task(tid))
 
         # 添加暂停/继续按钮
-        pause_btn = QtWidgets.QPushButton("暂停")
+        pause_btn = QtWidgets.QPushButton("⏸️")
+        pause_btn.setToolTip("暂停传输")
         pause_btn.setStyleSheet(
             "background-color: rgba(59, 130, 246, 0.08);"
             "color: #2563EB;"
             "border: 1px solid rgba(37, 99, 235, 0.2);"
-            "border-radius: 8px;"
-            "padding: 4px 12px;"
-            "font-size: 12px;"
+            "border-radius: 6px;"
+            "padding: 4px 8px;"
+            "font-size: 14px;"
+            "min-width: 30px;"
+            "max-width: 30px;"
         )
         pause_btn.clicked.connect(lambda _, tid=task_id: self.pause_transfer_task(tid))
 
@@ -1412,12 +1230,12 @@ class MainWindow(QtWidgets.QMainWindow):
         btn_container = QtWidgets.QWidget()
         btn_layout = QtWidgets.QHBoxLayout(btn_container)
         btn_layout.setContentsMargins(0, 0, 0, 0)
-        btn_layout.setSpacing(6)
+        btn_layout.setSpacing(4)
         btn_layout.addWidget(pause_btn)
         btn_layout.addWidget(cancel_btn)
         self.transfer_table.setCellWidget(row, 5, btn_container)
 
-        # 保存按钮引用，便于后续隐藏或修改文字
+        # 保存按钮引用，便于后续隐藏或修改
         task['cancel_button'] = cancel_btn
         task['pause_button'] = pause_btn
         
@@ -2046,7 +1864,76 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.critical(self, "错误", msg)
         self.status.showMessage(msg, 8000)
 
+    def get_theme_color(self, color_key):
+        """获取当前主题的颜色"""
+        mode = 'dark' if self.theme_manager.is_dark_mode else 'light'
+        return self.theme_colors[mode].get(color_key, '#000000')
+    
+    def get_sidebar_button_style(self, is_active=True):
+        """生成侧边栏按钮的样式表"""
+        if is_active:
+            # 活跃按钮（文件页）
+            bg_color = self.get_theme_color('accent')
+            text_color = "#ffffff"
+            border = "none"
+        else:
+            # 非活跃按钮（传输页等）
+            if self.theme_manager.is_dark_mode:
+                bg_color = "#414559"
+                text_color = "#cdd6f4"
+                border = "1px solid #585b70"
+            else:
+                bg_color = "#e8edf5"
+                text_color = "#4c4f69"
+                border = "1px solid #bcc0cc"
+        
+        return (
+            f"font-size: 13px; text-align: center; font-weight: 500; "
+            f"background-color: {bg_color}; "
+            f"color: {text_color}; "
+            f"border-radius: 16px; "
+            f"border: {border}; "
+            f"padding: 8px; "
+            f"line-height: 1.4;"
+        )
+    
+    def on_theme_changed(self):
+        """当主题改变时的回调"""
+        # 重新应用侧边栏样式
+        sidebar_bg = "#fafbfc" if not self.theme_manager.is_dark_mode else "#181825"
+        sidebar_border = "#acb0be" if not self.theme_manager.is_dark_mode else "#313244"
+        self.sidebar.setStyleSheet(
+            f"background-color: {sidebar_bg};"
+            f"border-right: 1px solid {sidebar_border};"
+            "border-radius: 0;"
+        )
+        
+        # 重新应用侧边栏标题颜色
+        if hasattr(self, 'sidebar_title'):
+            title_color = "#2d3749" if not self.theme_manager.is_dark_mode else "#cdd6f4"
+            self.sidebar_title.setStyleSheet(
+                f"font-size: 18px; font-weight: bold; color: {title_color}; margin-bottom: 16px; "
+                "padding: 8px 0;"
+            )
+        
+        # 重新应用侧边栏按钮样式
+        if hasattr(self, 'btn_files'):
+            self.btn_files.setStyleSheet(self.get_sidebar_button_style(is_active=True))
+        if hasattr(self, 'btn_transfer'):
+            self.btn_transfer.setStyleSheet(self.get_sidebar_button_style(is_active=False))
+    
     def closeEvent(self, event):
+        # 停止所有计时器，防止线程冲突
+        try:
+            if hasattr(self, 'spinner_timer') and self.spinner_timer.isActive():
+                self.spinner_timer.stop()
+        except Exception:
+            pass
+        try:
+            if hasattr(self, 'theme_timer') and self.theme_timer.isActive():
+                self.theme_timer.stop()
+        except Exception:
+            pass
         try:
             if self.pan and getattr(self.pan, "user_name", "") and getattr(self.pan, "password", ""):
                 self.pan.save_file()
