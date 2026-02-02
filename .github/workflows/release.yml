@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install nuitka zstandard
-
+          
       - name: Build with Nuitka
         working-directory: src
         run: |
@@ -46,7 +46,7 @@ jobs:
             --windows-icon-from-ico=icon.ico
         shell: bash
 
-      # Windows
+      # Windows artifact upload
       - name: Upload Windows artifact
         if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
@@ -54,7 +54,7 @@ jobs:
           name: 123pan-windows
           path: src/123pan.exe
 
-      # Linux
+      # Linux artifact upload
       - name: Upload Linux artifact
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
@@ -68,15 +68,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Download artifacts
+      - name: Download Windows artifact
+        if: runner.os == 'Linux'
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          name: 123pan-windows
+          path: ./artifacts/windows
+
+      - name: Download Linux artifact
+        if: runner.os == 'Linux'
+        uses: actions/download-artifact@v4
+        with:
+          name: 123pan-linux
+          path: ./artifacts/linux
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: Release ${{ github.ref_name }}
-          files: all_binaries/*
+          files: |
+            ./artifacts/windows/123pan.exe
+            ./artifacts/linux/123pan
           generate_release_notes: true
