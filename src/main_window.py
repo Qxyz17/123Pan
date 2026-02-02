@@ -8,6 +8,8 @@ import hashlib
 import requests
 import sys
 import time
+import concurrent.futures
+import threading
 from log import get_logger
 from config import ConfigManager
 from ui_widgets import SidebarButton, LoginDialog, SettingsDialog, AboutDialog
@@ -145,8 +147,8 @@ class MainWindow(QtWidgets.QMainWindow):
         sidebar_title = QtWidgets.QLabel("功能菜单")
         sidebar_title.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         sidebar_title.setStyleSheet(
-            "font-size: 20px; font-weight: bold; color: #334155; margin-bottom: 20px;"
-            "padding: 10px 0;"
+            "font-size: 18px; font-weight: bold; color: #1e293b; margin-bottom: 16px;"
+            "padding: 8px 0;"
         )
         sidebar_layout.addWidget(sidebar_title)
         
@@ -155,28 +157,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sidebar_animations = {}
         self.sidebar_original_geoms = {}
         
-        # 文件页按钮
-        self.btn_files = SidebarButton("📁 文件")
-        self.btn_files.setMinimumHeight(50)
+        # 文件页按钮 - 改为方形设计，图标居中，标签在下
+        self.btn_files = SidebarButton("📁\n文件")
+        self.btn_files.setMinimumHeight(100)
+        self.btn_files.setMinimumWidth(140)
+        self.btn_files.setMaximumHeight(100)
+        self.btn_files.setMaximumWidth(140)
         self.btn_files.setStyleSheet(
-            "font-size: 16px; text-align: left; padding-left: 20px;"
+            "font-size: 13px; text-align: center; font-weight: 500;"
             "background-color: rgba(59, 130, 246, 0.9);"
-            "color: white; border-radius: 12px;"
+            "color: white; border-radius: 16px;"
             "border: none;"
+            "padding: 8px;"
+            "line-height: 1.4;"
         )
-        sidebar_layout.addWidget(self.btn_files)
+        sidebar_layout.addWidget(self.btn_files, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.sidebar_buttons.append(self.btn_files)
         
-        # 传输页按钮
-        self.btn_transfer = SidebarButton("🔄 传输")
-        self.btn_transfer.setMinimumHeight(50)
+        # 传输页按钮 - 改为方形设计，图标居中，标签在下
+        self.btn_transfer = SidebarButton("🔄\n传输")
+        self.btn_transfer.setMinimumHeight(100)
+        self.btn_transfer.setMinimumWidth(140)
+        self.btn_transfer.setMaximumHeight(100)
+        self.btn_transfer.setMaximumWidth(140)
         self.btn_transfer.setStyleSheet(
-            "font-size: 16px; text-align: left; padding-left: 20px;"
-            "background-color: transparent; color: #334155;"
-            "border-radius: 12px;"
-            "border: none;"
+            "font-size: 13px; text-align: center; font-weight: 500;"
+            "background-color: rgba(229, 231, 235, 0.8); color: #334155;"
+            "border-radius: 16px;"
+            "border: 1px solid rgba(0, 0, 0, 0.08);"
+            "padding: 8px;"
+            "line-height: 1.4;"
         )
-        sidebar_layout.addWidget(self.btn_transfer)
+        sidebar_layout.addWidget(self.btn_transfer, alignment=QtCore.Qt.AlignmentFlag.AlignHCenter)
         self.sidebar_buttons.append(self.btn_transfer)
         
         # 为侧边栏按钮添加悬停和点击事件，实现动画效果
@@ -1175,17 +1187,21 @@ class MainWindow(QtWidgets.QMainWindow):
         for i, btn in enumerate(self.sidebar_buttons):
             if i == page_index:
                 btn.setStyleSheet(
-                    "font-size: 16px; text-align: left; padding-left: 20px;"
+                    "font-size: 13px; text-align: center; font-weight: 500;"
                     "background-color: rgba(59, 130, 246, 0.9);"
-                    "color: white; border-radius: 12px;"
+                    "color: white; border-radius: 16px;"
                     "border: none;"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
                 )
             else:
                 btn.setStyleSheet(
-                    "font-size: 16px; text-align: left; padding-left: 20px;"
-                    "background-color: transparent; color: #334155;"
-                    "border-radius: 12px;"
-                    "border: none;"
+                    "font-size: 13px; text-align: center; font-weight: 500;"
+                    "background-color: rgba(229, 231, 235, 0.8); color: #334155;"
+                    "border-radius: 16px;"
+                    "border: 1px solid rgba(0, 0, 0, 0.08);"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
                 )
         
         # 根据页面显示/隐藏路径栏和相关按钮
@@ -1213,99 +1229,128 @@ class MainWindow(QtWidgets.QMainWindow):
             self.btn_mkdir.setVisible(False)
     
     def on_sidebar_button_hover(self, button):
-        """侧边栏按钮悬停效果"""
-        # 停止当前正在运行的动画
-        if button in self.sidebar_animations:
-            self.sidebar_animations[button].stop()
-        
-        # 获取原始位置
-        if button not in self.sidebar_original_geoms:
-            self.save_original_position(button)
-        original_geom = self.sidebar_original_geoms[button]
-        
-        # 创建缩放动画
-        scale_animation = QtCore.QPropertyAnimation(button, b"geometry")
-        scale_animation.setStartValue(button.geometry())
-        scale_animation.setEndValue(QtCore.QRect(
-            original_geom.x() - 5,
-            original_geom.y() - 2,
-            original_geom.width() + 10,
-            original_geom.height() + 4
-        ))
-        scale_animation.setDuration(150)
-        scale_animation.setEasingCurve(QtCore.QEasingCurve.Type.OutQuad)
-        scale_animation.start()
-        
-        # 保存动画引用
-        self.sidebar_animations[button] = scale_animation
+        """侧边栏按钮悬停效果 - 改变背景色并增加阴影"""
+        if button == self.btn_files:
+            button.setStyleSheet(
+                "font-size: 13px; text-align: center; font-weight: 500;"
+                "background-color: rgba(37, 99, 235, 1);"
+                "color: white; border-radius: 16px;"
+                "border: none;"
+                "padding: 8px;"
+                "line-height: 1.4;"
+                "box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);"
+            )
+        elif button == self.btn_transfer:
+            button.setStyleSheet(
+                "font-size: 13px; text-align: center; font-weight: 500;"
+                "background-color: rgba(59, 130, 246, 0.15); color: #1e40af;"
+                "border-radius: 16px;"
+                "border: 1px solid rgba(37, 99, 235, 0.3);"
+                "padding: 8px;"
+                "line-height: 1.4;"
+            )
     
     def on_sidebar_button_leave(self, button):
-        """侧边栏按钮离开效果"""
-        # 停止当前正在运行的动画
-        if button in self.sidebar_animations:
-            self.sidebar_animations[button].stop()
-        
-        # 获取原始位置
-        if button not in self.sidebar_original_geoms:
-            self.save_original_position(button)
-        original_geom = self.sidebar_original_geoms[button]
-        
-        # 创建恢复动画
-        scale_animation = QtCore.QPropertyAnimation(button, b"geometry")
-        scale_animation.setStartValue(button.geometry())
-        scale_animation.setEndValue(original_geom)
-        scale_animation.setDuration(150)
-        scale_animation.setEasingCurve(QtCore.QEasingCurve.Type.OutQuad)
-        scale_animation.start()
-        
-        # 保存动画引用
-        self.sidebar_animations[button] = scale_animation
-    
-    def on_sidebar_button_pressed(self, button):
-        """侧边栏按钮按下效果"""
-        # 改变背景色
-        button.setStyleSheet(
-            button.styleSheet().replace(
-                "background-color: rgba(59, 130, 246, 0.9);",
-                "background-color: rgba(37, 99, 235, 0.9);"
-            ).replace(
-                "background-color: transparent;",
-                "background-color: rgba(59, 130, 246, 0.1);"
-            )
-        )
-    
-    def on_sidebar_button_released(self, button):
-        """侧边栏按钮释放效果"""
-        # 恢复背景色
+        """侧边栏按钮离开效果 - 恢复原始样式"""
         if button == self.btn_files:
             if self.page_stack.currentIndex() == 0:
                 button.setStyleSheet(
-                    "font-size: 16px; text-align: left; padding-left: 20px;"
+                    "font-size: 13px; text-align: center; font-weight: 500;"
                     "background-color: rgba(59, 130, 246, 0.9);"
-                    "color: white; border-radius: 12px;"
+                    "color: white; border-radius: 16px;"
                     "border: none;"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
                 )
             else:
                 button.setStyleSheet(
-                    "font-size: 16px; text-align: left; padding-left: 20px;"
-                    "background-color: transparent; color: #334155;"
-                    "border-radius: 12px;"
-                    "border: none;"
+                    "font-size: 13px; text-align: center; font-weight: 500;"
+                    "background-color: rgba(229, 231, 235, 0.8); color: #334155;"
+                    "border-radius: 16px;"
+                    "border: 1px solid rgba(0, 0, 0, 0.08);"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
                 )
         elif button == self.btn_transfer:
             if self.page_stack.currentIndex() == 1:
                 button.setStyleSheet(
-                    "font-size: 16px; text-align: left; padding-left: 20px;"
+                    "font-size: 13px; text-align: center; font-weight: 500;"
                     "background-color: rgba(59, 130, 246, 0.9);"
-                    "color: white; border-radius: 12px;"
+                    "color: white; border-radius: 16px;"
                     "border: none;"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
                 )
             else:
                 button.setStyleSheet(
-                    "font-size: 16px; text-align: left; padding-left: 20px;"
-                    "background-color: transparent; color: #334155;"
-                    "border-radius: 12px;"
+                    "font-size: 13px; text-align: center; font-weight: 500;"
+                    "background-color: rgba(229, 231, 235, 0.8); color: #334155;"
+                    "border-radius: 16px;"
+                    "border: 1px solid rgba(0, 0, 0, 0.08);"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
+                )
+    
+    def on_sidebar_button_pressed(self, button):
+        """侧边栏按钮按下效果 - 改变背景色与加深"""
+        if button == self.btn_files:
+            button.setStyleSheet(
+                "font-size: 13px; text-align: center; font-weight: 500;"
+                "background-color: rgba(29, 78, 216, 1);"
+                "color: white; border-radius: 16px;"
+                "border: none;"
+                "padding: 8px;"
+                "line-height: 1.4;"
+            )
+        elif button == self.btn_transfer:
+            button.setStyleSheet(
+                "font-size: 13px; text-align: center; font-weight: 500;"
+                "background-color: rgba(37, 99, 235, 0.2); color: #1e40af;"
+                "border-radius: 16px;"
+                "border: 1px solid rgba(37, 99, 235, 0.4);"
+                "padding: 8px;"
+                "line-height: 1.4;"
+            )
+    
+    def on_sidebar_button_released(self, button):
+        """侧边栏按钮释放效果 - 根据页面状态恢复样式"""
+        if button == self.btn_files:
+            if self.page_stack.currentIndex() == 0:
+                button.setStyleSheet(
+                    "font-size: 13px; text-align: center; font-weight: 500;"
+                    "background-color: rgba(59, 130, 246, 0.9);"
+                    "color: white; border-radius: 16px;"
                     "border: none;"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
+                )
+            else:
+                button.setStyleSheet(
+                    "font-size: 13px; text-align: center; font-weight: 500;"
+                    "background-color: rgba(229, 231, 235, 0.8); color: #334155;"
+                    "border-radius: 16px;"
+                    "border: 1px solid rgba(0, 0, 0, 0.08);"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
+                )
+        elif button == self.btn_transfer:
+            if self.page_stack.currentIndex() == 1:
+                button.setStyleSheet(
+                    "font-size: 13px; text-align: center; font-weight: 500;"
+                    "background-color: rgba(59, 130, 246, 0.9);"
+                    "color: white; border-radius: 16px;"
+                    "border: none;"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
+                )
+            else:
+                button.setStyleSheet(
+                    "font-size: 13px; text-align: center; font-weight: 500;"
+                    "background-color: rgba(229, 231, 235, 0.8); color: #334155;"
+                    "border-radius: 16px;"
+                    "border: 1px solid rgba(0, 0, 0, 0.08);"
+                    "padding: 8px;"
+                    "line-height: 1.4;"
                 )
     
     def add_transfer_task(self, task_type, file_name, file_size):
@@ -1350,7 +1395,31 @@ class MainWindow(QtWidgets.QMainWindow):
             "font-size: 12px;"
         )
         cancel_btn.clicked.connect(lambda _, tid=task_id: self.cancel_transfer_task(tid))
-        self.transfer_table.setCellWidget(row, 5, cancel_btn)
+
+        # 添加暂停/继续按钮
+        pause_btn = QtWidgets.QPushButton("暂停")
+        pause_btn.setStyleSheet(
+            "background-color: rgba(59, 130, 246, 0.08);"
+            "color: #2563EB;"
+            "border: 1px solid rgba(37, 99, 235, 0.2);"
+            "border-radius: 8px;"
+            "padding: 4px 12px;"
+            "font-size: 12px;"
+        )
+        pause_btn.clicked.connect(lambda _, tid=task_id: self.pause_transfer_task(tid))
+
+        # 将两个按钮放在一个容器里
+        btn_container = QtWidgets.QWidget()
+        btn_layout = QtWidgets.QHBoxLayout(btn_container)
+        btn_layout.setContentsMargins(0, 0, 0, 0)
+        btn_layout.setSpacing(6)
+        btn_layout.addWidget(pause_btn)
+        btn_layout.addWidget(cancel_btn)
+        self.transfer_table.setCellWidget(row, 5, btn_container)
+
+        # 保存按钮引用，便于后续隐藏或修改文字
+        task['cancel_button'] = cancel_btn
+        task['pause_button'] = pause_btn
         
         return task_id
     
@@ -1394,15 +1463,56 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.transfer_table.setItem(i, 3, QtWidgets.QTableWidgetItem("0%"))
                 self.transfer_table.setItem(i, 4, QtWidgets.QTableWidgetItem("已取消"))
                 
-                # 移除取消按钮
+                # 隐藏按钮容器
                 widget = self.transfer_table.cellWidget(i, 5)
                 if widget:
                     widget.setVisible(False)
+                # 也隐藏单独的按钮引用（若存在）
+                if task.get('pause_button'):
+                    try:
+                        task['pause_button'].setVisible(False)
+                    except Exception:
+                        pass
+                if task.get('cancel_button'):
+                    try:
+                        task['cancel_button'].setVisible(False)
+                    except Exception:
+                        pass
                 
                 # 从活动任务列表中移除
                 if task_id in self.active_tasks:
                     del self.active_tasks[task_id]
                 
+                break
+
+    def pause_transfer_task(self, task_id):
+        """切换暂停/继续传输任务"""
+        for i, task in enumerate(self.transfer_tasks):
+            if task["id"] == task_id:
+                threaded = task.get("threaded_task")
+                pause_btn = task.get('pause_button')
+                if not threaded:
+                    return
+                # 切换状态
+                if getattr(threaded, 'is_paused', False):
+                    try:
+                        threaded.resume()
+                    except Exception:
+                        pass
+                    task["status"] = "下载中"
+                    if pause_btn:
+                        pause_btn.setText("暂停")
+                else:
+                    try:
+                        threaded.pause()
+                    except Exception:
+                        pass
+                    task["status"] = "已暂停"
+                    if pause_btn:
+                        pause_btn.setText("继续")
+
+                # 更新表格显示
+                self.transfer_table.setItem(i, 4, QtWidgets.QTableWidgetItem(task["status"]))
                 break
     
     def remove_transfer_task(self, task_id):
@@ -1514,42 +1624,172 @@ class MainWindow(QtWidgets.QMainWindow):
             fname = file_detail["FileName"]
         out_path = os.path.join(download_dir, fname)
         temp = out_path + ".123pan"
-        
+
         # 保存文件路径到任务对象
         for i, t in enumerate(self.transfer_tasks):
             if t["id"] == task_id:
                 self.transfer_tasks[i]["file_path"] = temp
                 break
-        
+
         if os.path.exists(out_path):
             reply = QtWidgets.QMessageBox.question(None, "文件已存在", f"{fname} 已存在，是否覆盖？", QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No)
             if reply == QtWidgets.QMessageBox.StandardButton.No:
                 return "已取消"
-        with requests.get(redirect_url, stream=True, timeout=30) as r:
-            r.raise_for_status()
-            total = int(r.headers.get("Content-Length", 0) or 0)
-            done = 0
-            with open(temp, "wb") as f:
-                for chunk in r.iter_content(chunk_size=8192):
-                    # 检查是否被取消
-                    if task and task.is_cancelled:
-                        f.close()
-                        # 删除临时文件
-                        if os.path.exists(temp):
-                            os.remove(temp)
-                        return "已取消"
-                    if chunk:
-                        f.write(chunk)
-                        done += len(chunk)
-                        if total and signals:
-                            signals.progress.emit(int(done * 100 / total))
-            if task and task.is_cancelled:
-                # 删除临时文件
-                if os.path.exists(temp):
+
+        # 尝试获取头信息，判断是否支持 Range
+        total = 0
+        accept_ranges = False
+        try:
+            head = requests.head(redirect_url, allow_redirects=True, timeout=30)
+            head.raise_for_status()
+            total = int(head.headers.get("Content-Length", 0) or 0)
+            accept_ranges = head.headers.get("Accept-Ranges", "").lower() == "bytes"
+        except Exception:
+            # 有些链接不支持 HEAD，使用 GET 获取 headers
+            try:
+                with requests.get(redirect_url, stream=True, timeout=30) as r:
+                    r.raise_for_status()
+                    total = int(r.headers.get("Content-Length", 0) or 0)
+                    accept_ranges = r.headers.get("Accept-Ranges", "").lower() == "bytes"
+            except Exception:
+                total = 0
+                accept_ranges = False
+
+        # 如果支持分片并且文件较大，则采用多线程分片下载
+        try:
+            if accept_ranges and total and total > 1024 * 1024 * 2:
+                # 计算分片数（最多 8 片）
+                num_threads = min(8, max(1, int(total / (5 * 1024 * 1024))))
+                part_size = total // num_threads
+                parts = []
+                downloaded = [0]
+                dl_lock = threading.Lock()
+
+                def download_range(start, end, index):
+                    part_path = f"{temp}.part{index}"
+                    headers = {"Range": f"bytes={start}-{end}"}
+                    try:
+                        with requests.get(redirect_url, headers=headers, stream=True, timeout=30) as r:
+                            r.raise_for_status()
+                            with open(part_path, "wb") as pf:
+                                for chunk in r.iter_content(chunk_size=8192):
+                                    # 支持暂停/继续
+                                    if task:
+                                        # wait 如果被暂停，会在这里阻塞
+                                        try:
+                                            task._pause_event.wait()
+                                        except Exception:
+                                            pass
+                                        if task.is_cancelled:
+                                            return False
+                                    if chunk:
+                                        pf.write(chunk)
+                                        with dl_lock:
+                                            downloaded[0] += len(chunk)
+                                            if total and signals:
+                                                signals.progress.emit(int(downloaded[0] * 100 / total))
+                        return True
+                    except Exception:
+                        # 出错时确保部分文件被删除
+                        if os.path.exists(part_path):
+                            try:
+                                os.remove(part_path)
+                            except Exception:
+                                pass
+                        return False
+
+                # 提交分片任务
+                futures = []
+                with concurrent.futures.ThreadPoolExecutor(max_workers=num_threads) as exe:
+                    for i in range(num_threads):
+                        start = i * part_size
+                        end = (start + part_size - 1) if i < num_threads - 1 else (total - 1)
+                        futures.append(exe.submit(download_range, start, end, i))
+
+                    # 等待完成
+                    ok = True
+                    for f in concurrent.futures.as_completed(futures):
+                        if not f.result():
+                            ok = False
+                            break
+
+                if not ok:
+                    # 清理部分文件
+                    for i in range(num_threads):
+                        p = f"{temp}.part{i}"
+                        if os.path.exists(p):
+                            try:
+                                os.remove(p)
+                            except Exception:
+                                pass
+                    raise RuntimeError("分片下载失败")
+                if task and task.is_cancelled:
+                    for i in range(num_threads):
+                        p = f"{temp}.part{i}"
+                        if os.path.exists(p):
+                            try:
+                                os.remove(p)
+                            except Exception:
+                                pass
+                    return "已取消"
+
+                # 合并部分文件
+                with open(temp, "wb") as out_f:
+                    for i in range(num_threads):
+                        p = f"{temp}.part{i}"
+                        with open(p, "rb") as pf:
+                            while True:
+                                chunk = pf.read(8192)
+                                if not chunk:
+                                    break
+                                out_f.write(chunk)
+                        try:
+                            os.remove(p)
+                        except Exception:
+                            pass
+
+                if task and task.is_cancelled:
+                    if os.path.exists(temp):
+                        os.remove(temp)
+                    return "已取消"
+                os.replace(temp, out_path)
+                return out_path
+            else:
+                # 单线程流式下载，支持暂停/取消
+                with requests.get(redirect_url, stream=True, timeout=30) as r:
+                    r.raise_for_status()
+                    done = 0
+                    with open(temp, "wb") as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if task:
+                                try:
+                                    task._pause_event.wait()
+                                except Exception:
+                                    pass
+                                if task.is_cancelled:
+                                    f.close()
+                                    if os.path.exists(temp):
+                                        os.remove(temp)
+                                    return "已取消"
+                            if chunk:
+                                f.write(chunk)
+                                done += len(chunk)
+                                if total and signals:
+                                    signals.progress.emit(int(done * 100 / total))
+                if task and task.is_cancelled:
+                    if os.path.exists(temp):
+                        os.remove(temp)
+                    return "已取消"
+                os.replace(temp, out_path)
+                return out_path
+        except Exception as e:
+            # 如果发生异常，删除临时文件并抛出
+            if os.path.exists(temp):
+                try:
                     os.remove(temp)
-                return "已取消"
-            os.replace(temp, out_path)
-        return out_path
+                except Exception:
+                    pass
+            raise
 
     def on_showlink(self):
         file_index, file_detail = self.get_selected_detail()

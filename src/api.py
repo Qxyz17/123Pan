@@ -514,6 +514,7 @@ class Pan123:
             raise RuntimeError("同名文件存在")
         if res_code_up != 0:
             raise RuntimeError(f"上传请求失败: {up_res_json}")
+        up_file_id = up_res_json["data"]["FileId"]
         if up_res_json["data"].get("Reuse", False):
             return up_file_id
 
